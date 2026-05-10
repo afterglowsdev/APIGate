@@ -1,14 +1,14 @@
 import type { Hono } from 'hono'
 import type { GatewayVariables, GatewayBindings } from '../types/env.js'
 import type { IConfigStore } from '../interfaces/config-store.js'
+import type { IDeviceStore } from '../interfaces/device-store.js'
 import type { Logger } from '../services/logger.js'
 import { createAdminAuthMiddleware, createLoginHandler, createLogoutHandler } from '../services/admin-auth.js'
 import { createProxyHandler } from '../services/proxy.js'
-import { maskToken } from '../utils/crypto.js'
 
 /**
- * Validates config for saving (lenient: only structural checks).
- * Returns warnings for incomplete config.
+ * Lenient validation for config save — only structural checks, allows incomplete drafts.
+ * 保存时宽松校验 — 仅做结构检查，允许草稿。
  */
 function validateConfigForSave(config: unknown): { ok: boolean; warnings: string[] } {
   const warnings: string[] = []
@@ -20,8 +20,8 @@ function validateConfigForSave(config: unknown): { ok: boolean; warnings: string
   if (c.profiles !== undefined && typeof c.profiles !== 'object') {
     return { ok: false, warnings: ['profiles must be an object'] }
   }
-  if (c.clients !== undefined && !Array.isArray(c.clients)) {
-    return { ok: false, warnings: ['clients must be an array'] }
+  if (c.apps !== undefined && !Array.isArray(c.apps)) {
+    return { ok: false, warnings: ['apps must be an array'] }
   }
   if (c.defaultProfile !== undefined && typeof c.defaultProfile !== 'string') {
     warnings.push('defaultProfile should be a string')
@@ -33,46 +33,17 @@ function validateConfigForSave(config: unknown): { ok: boolean; warnings: string
     warnings.push('requestBodyLimitBytes must be a positive number')
   }
 
-  // Check each profile
-  if (c.profiles && typeof c.profiles === 'object') {
-    for (const [name, profile] of Object.entries(c.profiles)) {
-      const p = profile as Record<string, unknown>
-      if (p.max_tokens !== undefined && (typeof p.max_tokens !== 'number' || (p.max_tokens as number) < 0)) {
-        warnings.push(`profile "${name}": max_tokens must be non-negative`)
-      }
-      if (p.models && Array.isArray(p.models)) {
-        for (const m of p.models) {
-          const model = m as Record<string, unknown>
-          if (model.weight !== undefined && (typeof model.weight !== 'number' || (model.weight as number) < 0)) {
-            warnings.push(`profile "${name}": model weight must be non-negative`)
-          }
+  // Check apps / 检查应用
+  if (c.apps && Array.isArray(c.apps)) {
+    for (const app of c.apps) {
+      const a = app as Record<string, unknown>
+      if (a.enabled === true) {
+        if (!a.appId || (a.appId as string).length === 0) {
+          warnings.push(`app: enabled but has no appId`)
         }
-      }
-      if (p.enabled === true) {
-        if (!p.models || !Array.isArray(p.models) || (p.models as unknown[]).length === 0) {
-          warnings.push(`profile "${name}": enabled but has no models`)
+        if (!a.allowedProfiles || !Array.isArray(a.allowedProfiles) || (a.allowedProfiles as unknown[]).length === 0) {
+          warnings.push(`app "${a.appId || 'unknown'}": enabled but has no allowedProfiles`)
         }
-        if (!p.max_tokens || (p.max_tokens as number) <= 0) {
-          warnings.push(`profile "${name}": enabled but max_tokens is missing`)
-        }
-      }
-    }
-  }
-
-  // Check each client
-  if (c.clients && Array.isArray(c.clients)) {
-    for (const client of c.clients) {
-      const cl = client as Record<string, unknown>
-      if (cl.enabled === true) {
-        if (!cl.token || (cl.token as string).length === 0) {
-          warnings.push(`client "${cl.id || 'unknown'}": enabled but has no token`)
-        }
-        if (!cl.allowedProfiles || !Array.isArray(cl.allowedProfiles) || (cl.allowedProfiles as unknown[]).length === 0) {
-          warnings.push(`client "${cl.id || 'unknown'}": enabled but has no allowedProfiles`)
-        }
-      }
-      if (cl.dailyQuota !== undefined && (typeof cl.dailyQuota !== 'number' || (cl.dailyQuota as number) < 0)) {
-        warnings.push(`client "${cl.id || 'unknown'}": dailyQuota must be non-negative`)
       }
     }
   }
@@ -83,6 +54,7 @@ function validateConfigForSave(config: unknown): { ok: boolean; warnings: string
 export function registerAdminRoutes(
   app: Hono<{ Variables: GatewayVariables; Bindings: GatewayBindings }>,
   configStore: IConfigStore,
+  deviceStore: IDeviceStore,
   logger: Logger,
   adminPassword: string,
   jwtSecret: string,
@@ -93,33 +65,28 @@ export function registerAdminRoutes(
   const loginHandler = createLoginHandler(adminPassword, jwtSecret, logger)
   const logoutHandler = createLogoutHandler()
 
-  // Public: login
+  // ---- Public / 公开 ----
   app.post('/api/admin/login', (c) => loginHandler(c))
 
-  // Protected routes
+  // ---- Protected / 需登录 ----
   app.post('/api/admin/logout', adminAuth, (c) => logoutHandler(c))
 
-  app.get('/api/admin/session', adminAuth, (c) => {
-    return c.json({ authenticated: true })
-  })
+  app.get('/api/admin/session', adminAuth, (c) => c.json({ authenticated: true }))
 
   app.get('/api/admin/status', adminAuth, async (c) => {
     const config = await configStore.getConfig()
+    // Count total devices / 统计设备总数
+    const deviceList = await deviceStore.listDevices({ limit: 0 })
     return c.json({
       profiles: Object.keys(config.profiles).length,
-      clients: config.clients.length,
+      apps: config.apps.length,
+      devices: deviceList.total,
       defaultProfile: config.defaultProfile,
       profilesList: Object.entries(config.profiles).map(([name, p]) => ({
-        name,
-        enabled: p.enabled,
-        modelCount: p.models.length,
-        description: p.description,
+        name, enabled: p.enabled, modelCount: p.models.length, description: p.description,
       })),
-      clientsList: config.clients.map((cl) => ({
-        id: cl.id,
-        name: cl.name,
-        enabled: cl.enabled,
-        tokenPreview: maskToken(cl.token, 4),
+      appsList: config.apps.map((a) => ({
+        appId: a.appId, name: a.name, enabled: a.enabled,
       })),
       debug: config.debug,
       timeoutMs: config.timeoutMs,
@@ -129,12 +96,12 @@ export function registerAdminRoutes(
 
   app.get('/api/admin/config', adminAuth, async (c) => {
     const config = await configStore.getConfig()
-    // Mask sensitive data
+    // Mask app secrets / 遮盖应用密钥
     const safeConfig = {
       ...config,
-      clients: config.clients.map((cl) => ({
-        ...cl,
-        token: maskToken(cl.token, 4),
+      apps: config.apps.map((a) => ({
+        ...a,
+        appSecret: a.appSecret ? '****' : '',
       })),
     }
     return c.json(safeConfig)
@@ -142,53 +109,101 @@ export function registerAdminRoutes(
 
   app.put('/api/admin/config', adminAuth, async (c) => {
     let body: Record<string, unknown>
-    try {
-      body = await c.req.json()
-    } catch {
+    try { body = await c.req.json() } catch {
       return c.json({ ok: false, warnings: ['Invalid JSON body'] }, 400)
     }
 
     const validation = validateConfigForSave(body)
-    if (!validation.ok) {
-      return c.json(validation, 400)
-    }
+    if (!validation.ok) return c.json(validation, 400)
 
-    // Merge with existing config to preserve fields that weren't sent
     const existing = await configStore.getConfig()
     const merged = { ...existing, ...body } as typeof existing
 
-    // Preserve un-masked client tokens from existing config
-    if (body.clients && Array.isArray(body.clients)) {
-      merged.clients = (body.clients as Record<string, unknown>[]).map((newClient, i) => {
-        const existingClient = existing.clients[i]
-        const token = newClient.token as string
-        // If token wasn't changed (still masked), keep existing
-        if (existingClient && token && token.startsWith('****')) {
-          return { ...existingClient, ...newClient, token: existingClient.token }
+    // Preserve masked app secrets / 保留被遮盖的密钥
+    if (body.apps && Array.isArray(body.apps)) {
+      merged.apps = (body.apps as Record<string, unknown>[]).map((newApp, i) => {
+        const existingApp = existing.apps[i]
+        const secret = newApp.appSecret as string
+        if (existingApp && secret === '****') {
+          return { ...existingApp, ...newApp, appSecret: existingApp.appSecret }
         }
-        return { ...existingClient, ...newClient } as typeof existing.clients[0]
+        return { ...existingApp, ...newApp } as typeof existing.apps[0]
       })
     }
 
     await configStore.saveConfig(merged)
     logger.info('Config saved', { warnings: validation.warnings })
-
     return c.json({ ok: true, warnings: validation.warnings })
   })
 
-  // Test endpoint — uses same proxy logic
+  // ---- Device management / 设备管理 ----
+  app.get('/api/admin/devices', adminAuth, async (c) => {
+    const appId = c.req.query('appId')
+    const status = c.req.query('status') as 'active' | 'blocked' | undefined
+    const search = c.req.query('search')
+    const offset = parseInt(c.req.query('offset') || '0', 10)
+    const limit = parseInt(c.req.query('limit') || '50', 10)
+
+    const result = await deviceStore.listDevices({
+      appId,
+      status,
+      search,
+      offset,
+      limit: Math.min(limit, 200),
+    })
+    return c.json(result)
+  })
+
+  // Block a device / 封禁设备
+  app.post('/api/admin/devices/:appId/:deviceId/block', adminAuth, async (c) => {
+    const { appId, deviceId } = c.req.param()
+    await deviceStore.setDeviceStatus(appId, deviceId, 'blocked')
+    logger.info('Device blocked', { appId, deviceId })
+    return c.json({ ok: true })
+  })
+
+  // Unblock a device / 解封设备
+  app.post('/api/admin/devices/:appId/:deviceId/unblock', adminAuth, async (c) => {
+    const { appId, deviceId } = c.req.param()
+    await deviceStore.setDeviceStatus(appId, deviceId, 'active')
+    logger.info('Device unblocked', { appId, deviceId })
+    return c.json({ ok: true })
+  })
+
+  // Update device note / 更新设备备注
+  app.put('/api/admin/devices/:appId/:deviceId/note', adminAuth, async (c) => {
+    const { appId, deviceId } = c.req.param()
+    let body: { note?: string }
+    try { body = await c.req.json() } catch {
+      return c.json({ ok: false, message: 'Invalid JSON' }, 400)
+    }
+    const device = await deviceStore.getDevice(appId, deviceId)
+    if (!device) return c.json({ ok: false, message: 'Device not found' }, 404)
+    device.note = body.note
+    await deviceStore.upsertDevice(device)
+    return c.json({ ok: true })
+  })
+
+  // ---- Test endpoint / 测试端点 ----
   app.post('/api/admin/test', adminAuth, async (c) => {
     const proxyHandler = createProxyHandler(configStore, logger, newApiToken, newApiBaseUrl)
-    // Inject a fake client for test requests
-    c.set('client', {
-      id: 'admin-test',
+    // Inject a fake app for test requests / 为测试请求注入虚拟应用
+    c.set('app', {
+      appId: 'admin-test',
       name: 'Admin Test',
-      token: '',
       enabled: true,
+      requireAppSecret: false,
+      appSecret: '',
+      identifiers: [],
+      autoRegisterDevices: false,
+      allowAnonymousDevices: true,
+      defaultProfile: '',
       allowedProfiles: [],
-      dailyQuota: 0,
-      monthlyQuota: 0,
-      rateLimitPerMinute: 0,
+      perDeviceDailyQuota: 0,
+      perDeviceMonthlyQuota: 0,
+      perDeviceRateLimitPerMinute: 0,
+      perIpRateLimitPerMinute: 0,
+      globalRateLimitPerMinute: 0,
     })
     return proxyHandler(c)
   })

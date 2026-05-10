@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { useLocale } from '../locales'
+
+const { messages: t } = useLocale()
+
 defineProps<{
   open: boolean
   title: string
@@ -28,7 +32,7 @@ const emit = defineEmits<{
             @click="emit('cancel')"
             class="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200 transition-colors"
           >
-            Cancel
+            {{ t.dialog.cancel }}
           </button>
           <button
             @click="emit('confirm')"
@@ -37,7 +41,7 @@ const emit = defineEmits<{
               danger ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-900 hover:bg-gray-800'
             ]"
           >
-            {{ confirmLabel || 'Confirm' }}
+            {{ confirmLabel || (danger ? t.dialog.delete : t.dialog.confirm) }}
           </button>
         </div>
       </div>

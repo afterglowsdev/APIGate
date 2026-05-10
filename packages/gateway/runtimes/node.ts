@@ -19,13 +19,20 @@ import { EnvConfigStore } from '../src/stores/config/env.js'
 import { MemoryUsageStore } from '../src/stores/usage/memory.js'
 import { FileUsageStore } from '../src/stores/usage/file.js'
 import { MemoryRateLimitStore } from '../src/stores/rate-limit/memory.js'
+import { MemoryDeviceStore } from '../src/stores/device/memory.js'
+import { FileDeviceStore } from '../src/stores/device/file.js'
 import type { IConfigStore } from '../src/interfaces/config-store.js'
 import type { IUsageStore } from '../src/interfaces/usage-store.js'
 import type { IRateLimitStore } from '../src/interfaces/rate-limit-store.js'
+import type { IDeviceStore } from '../src/interfaces/device-store.js'
 import type { LogLevel, LogFormat } from '../src/services/logger.js'
 import { readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
 
 // ---- Load secrets from local secret.json or environment variables ----
 
@@ -33,15 +40,29 @@ async function loadSecrets(): Promise<Record<string, string>> {
   const secrets: Record<string, string> = {}
 
   // Try loading from secret.json (local dev convenience)
-  const secretPath = resolve(process.cwd(), 'secret.json')
-  if (existsSync(secretPath)) {
+  // Search: same dir as node.ts, then CWD
+  const searchPaths = [
+    resolve(__dirname, '..', 'secret.json'),           // packages/gateway/secret.json (RELATIVE TO FILE)
+    resolve(process.cwd(), 'secret.json'),              // CWD/secret.json
+    resolve(process.cwd(), 'packages', 'gateway', 'secret.json'), // root/packages/gateway/secret.json
+  ]
+  let secretPath = ''
+  for (const p of searchPaths) {
+    if (existsSync(p)) { secretPath = p; break }
+  }
+
+  if (secretPath) {
     try {
       const raw = await readFile(secretPath, 'utf-8')
       const parsed = JSON.parse(raw) as Record<string, string>
       Object.assign(secrets, parsed)
+      console.log('[gateway] Loaded secrets from:', secretPath)
     } catch {
       console.warn('[gateway] Failed to parse secret.json, falling back to env vars')
     }
+  } else {
+    console.log('[gateway] No secret.json found, using env vars')
+    console.log('[gateway] Searched:', searchPaths)
   }
 
   // Env vars take precedence
@@ -97,6 +118,21 @@ function createRateLimitStore(_secrets: Record<string, string>): IRateLimitStore
   return new MemoryRateLimitStore()
 }
 
+function createDeviceStore(secrets: Record<string, string>): IDeviceStore {
+  const type = secrets.DEVICE_STORE_TYPE || 'memory'
+  switch (type) {
+    case 'file': {
+      const path = secrets.DEVICE_FILE_PATH || './data/gateway-devices.json'
+      console.log(`[gateway] Using FileDeviceStore: ${path}`)
+      return new FileDeviceStore(path)
+    }
+    case 'memory':
+    default:
+      console.log('[gateway] Using MemoryDeviceStore')
+      return new MemoryDeviceStore()
+  }
+}
+
 // ---- Main ----
 
 async function main() {
@@ -117,11 +153,13 @@ async function main() {
   const configStore = createConfigStore(secrets)
   const usageStore = createUsageStore(secrets)
   const rateLimitStore = createRateLimitStore(secrets)
+  const deviceStore = createDeviceStore(secrets)
 
   const app = createApp({
     configStore,
     usageStore,
     rateLimitStore,
+    deviceStore,
     newApiBaseUrl,
     newApiToken,
     adminPassword,

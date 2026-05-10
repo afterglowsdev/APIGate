@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { api } from '../api/client'
-import type { GatewayConfigResponse, ProfileData, ClientData } from '../api/client'
+import type { GatewayConfigResponse, ProfileData, AppData } from '../api/client'
 
 export const useConfigStore = defineStore('config', () => {
   const config = ref<GatewayConfigResponse | null>(null)
@@ -10,84 +10,47 @@ export const useConfigStore = defineStore('config', () => {
   const warnings = ref<string[]>([])
 
   const profiles = computed(() => config.value?.profiles ?? {})
-  const clients = computed(() => config.value?.clients ?? [])
+  const apps = computed(() => config.value?.apps ?? [])
 
   async function loadConfig() {
-    isLoading.value = true
-    error.value = ''
-    try {
-      config.value = await api.getConfig()
-    } catch (e) {
-      error.value = (e as Error).message
-    } finally {
-      isLoading.value = false
-    }
+    isLoading.value = true; error.value = ''
+    try { config.value = await api.getConfig() } catch (e) { error.value = (e as Error).message }
+    finally { isLoading.value = false }
   }
 
   async function saveConfig(): Promise<boolean> {
     if (!config.value) return false
-    isLoading.value = true
-    error.value = ''
-    warnings.value = []
-    try {
-      const result = await api.saveConfig(config.value)
-      warnings.value = result.warnings
-      return true
-    } catch (e) {
-      error.value = (e as Error).message
-      return false
-    } finally {
-      isLoading.value = false
-    }
+    isLoading.value = true; error.value = ''; warnings.value = []
+    try { const result = await api.saveConfig(config.value); warnings.value = result.warnings; return true }
+    catch (e) { error.value = (e as Error).message; return false }
+    finally { isLoading.value = false }
   }
 
-  function updateProfile(name: string, profile: ProfileData) {
-    if (!config.value) return
-    config.value.profiles[name] = profile
-  }
-
+  // Profiles / 模型档位
+  function updateProfile(name: string, profile: ProfileData) { if (!config.value) return; config.value.profiles[name] = profile }
   function addProfile(name: string) {
     if (!config.value) return
-    config.value.profiles[name] = {
-      enabled: false,
-      description: '',
-      models: [],
-      max_tokens: 2048,
-      temperature: 0.7,
-    }
+    config.value.profiles[name] = { enabled: false, description: '', models: [], max_tokens: 2048, temperature: 0.7 }
   }
-
   function deleteProfile(name: string) {
     if (!config.value) return
     delete config.value.profiles[name]
-    // Also clean up from clients
-    for (const client of config.value.clients) {
-      client.allowedProfiles = client.allowedProfiles.filter((p) => p !== name)
-    }
-    if (config.value.defaultProfile === name) {
-      config.value.defaultProfile = ''
-    }
+    for (const app of config.value.apps) app.allowedProfiles = app.allowedProfiles.filter(p => p !== name)
+    if (config.value.defaultProfile === name) config.value.defaultProfile = ''
   }
 
-  function updateClient(id: string, client: ClientData) {
+  // Apps / 应用接入
+  function updateApp(appId: string, app: AppData) {
     if (!config.value) return
-    const idx = config.value.clients.findIndex((c) => c.id === id)
-    if (idx >= 0) {
-      config.value.clients[idx] = client
-    }
+    const idx = config.value.apps.findIndex(a => a.appId === appId)
+    if (idx >= 0) config.value.apps[idx] = app
   }
-
-  function addClient(client: ClientData) {
+  function addApp(app: AppData) { if (!config.value) return; config.value.apps.push(app) }
+  function deleteApp(appId: string) {
     if (!config.value) return
-    config.value.clients.push(client)
+    config.value.apps = config.value.apps.filter(a => a.appId !== appId)
   }
 
-  function deleteClient(id: string) {
-    if (!config.value) return
-    config.value.clients = config.value.clients.filter((c) => c.id !== id)
-  }
-
-  // Validation helpers for UI status display
   function validateProfile(profile: ProfileData): string[] {
     const errors: string[] = []
     if (profile.models.length === 0) errors.push('Missing models')
@@ -95,22 +58,19 @@ export const useConfigStore = defineStore('config', () => {
     return errors
   }
 
-  function validateClient(client: ClientData): string[] {
+  function validateApp(app: AppData): string[] {
     const errors: string[] = []
-    if (!client.token || client.token.startsWith('****')) {
-      // Token is masked - check if there's a real token underneath
-    }
-    if (!client.token) errors.push('Missing token')
-    if (client.allowedProfiles.length === 0) errors.push('Missing allowed profiles')
+    if (!app.appId) errors.push('Missing appId')
+    if (!app.appSecret && app.requireAppSecret) errors.push('requireAppSecret is on but no secret set')
+    if (app.allowedProfiles.length === 0) errors.push('Missing allowed profiles')
     return errors
   }
 
   return {
-    config, isLoading, error, warnings,
-    profiles, clients,
+    config, isLoading, error, warnings, profiles, apps,
     loadConfig, saveConfig,
     updateProfile, addProfile, deleteProfile,
-    updateClient, addClient, deleteClient,
-    validateProfile, validateClient,
+    updateApp, addApp, deleteApp,
+    validateProfile, validateApp,
   }
 })

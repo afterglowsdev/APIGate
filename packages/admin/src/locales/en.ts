@@ -1,0 +1,102 @@
+export default {
+  app: { title: 'LLM Gateway', subtitle: 'Admin Console' },
+  save: 'Save', cancel: 'Cancel', delete: 'Delete', edit: 'Edit', create: 'New', confirm: 'Confirm',
+  loading: 'Loading...', noData: 'No data', saving: 'Saving...', more: 'More',
+
+  sidebar: {
+    dashboard: 'Dashboard', profiles: 'Profiles', apps: 'Apps', devices: 'Devices',
+    settings: 'Settings', playground: 'Playground', logout: 'Sign out',
+  },
+
+  login: {
+    title: 'Gateway Admin', subtitle: 'Sign in to manage the gateway',
+    password: 'Password', placeholder: 'Enter admin password', submit: 'Sign in', submitting: 'Signing in...',
+  },
+
+  dashboard: {
+    title: 'Dashboard', subtitle: 'Gateway status overview',
+    profiles: 'Profiles', profilesDesc: 'Model profiles configured',
+    apps: 'Apps', appsDesc: 'Registered applications',
+    devices: 'Devices', devicesDesc: 'Auto-discovered devices',
+    defaultProfile: 'Default Profile', defaultProfileDesc: 'Fallback when none specified',
+    timeout: 'Timeout', timeoutDesc: 'Upstream request timeout',
+    profilesList: 'Profiles', appsList: 'Apps',
+    models: 'models', enabled: 'Enabled', disabled: 'Disabled',
+  },
+
+  profiles: {
+    title: 'Model Profiles', subtitle: 'Define model pools with weighted selection',
+    newProfile: 'New Profile', namePlaceholder: 'Profile name (e.g. app-fast)',
+    create: 'Create', noProfiles: 'No profiles yet. Create one to get started.',
+    description: 'Description', maxTokens: 'Max Tokens', temperature: 'Temperature',
+    models: 'Models', modelName: 'Model name', weight: 'Weight', addModel: 'Add model',
+    enabled: 'Enabled', notEnabled: 'Disabled', missing: 'Missing',
+    deleteTitle: 'Delete Profile', deleteMsg: 'Delete profile "{name}"? This cannot be undone.',
+  },
+
+  apps: {
+    title: 'Apps', subtitle: 'Manage applications that access the gateway. Devices are auto-discovered — no need to manually create tokens for each user.',
+    newApp: 'New App',
+    appId: 'App ID', appIdPlaceholder: 'e.g. desktop-app',
+    name: 'Name', namePlaceholder: 'Display name',
+    enabled: 'Enabled', disabled: 'Disabled',
+    appSecret: 'App Secret (optional)', genSecret: 'Generate',
+    requireAppSecret: 'Require Secret',
+    requireSecretDesc: 'If enabled, requests must carry X-App-Secret or Authorization Bearer',
+    autoRegisterDevices: 'Auto-register Devices',
+    autoRegisterDesc: 'New devices are registered on first request',
+    allowAnonymousDevices: 'Allow Anonymous Devices',
+    allowAnonymousDesc: 'Unregistered devices can still pass (when auto-register is off)',
+    defaultProfile: 'Default Profile',
+    allowedProfiles: 'Allowed Profiles',
+    perDeviceDailyQuota: 'Per-device Daily Quota',
+    perDeviceMonthlyQuota: 'Per-device Monthly Quota',
+    perDeviceRateLimitPerMinute: 'Per-device Rate Limit (req/min)',
+    perIpRateLimitPerMinute: 'Per-IP Rate Limit (req/min)',
+    globalRateLimitPerMinute: 'Global Rate Limit (req/min)',
+    minAppVersion: 'Min App Version',
+    allowedHours: 'Allowed Hours',
+    identifiers: 'Auth Identifiers',
+    identifiersDesc: 'Configure which HTTP headers the client must send and their purpose. Evaluated in order; the first matching device/user type is used as the rate-limit key.',
+    addIdentifier: 'Add Identifier',
+    noIdentifiers: 'No identifiers configured',
+    required: 'Required',
+    track: 'Track',
+    noApps: 'No apps yet. Create one to get started.',
+    deleteTitle: 'Delete App', deleteMsg: 'Delete app "{name}"? Device data will be preserved.',
+    missingAppId: 'Missing app ID', missingProfile: 'Missing allowed profiles',
+  },
+
+  devices: {
+    title: 'Devices', subtitle: 'Auto-discovered devices. Devices are registered on first request from a client.',
+    appId: 'App ID', deviceId: 'Device ID', status: 'Status', appVersion: 'Version',
+    platform: 'Platform', firstSeen: 'First Seen', lastSeen: 'Last Seen', ipHash: 'IP Hash',
+    note: 'Note', todayRequests: 'Today', monthRequests: 'This Month',
+    active: 'Active', blocked: 'Blocked',
+    block: 'Block', unblock: 'Unblock', addNote: 'Add Note',
+    search: 'Search device ID or note...',
+    filterApp: 'Filter by app', filterStatus: 'Filter by status', all: 'All',
+    blockTitle: 'Block Device', blockMsg: 'Block device "{id}"? It will not be able to make requests.',
+    unblockTitle: 'Unblock Device', unblockMsg: 'Unblock device "{id}"?',
+    noDevices: 'No devices yet',
+  },
+
+  settings: {
+    title: 'Settings', subtitle: 'Gateway configuration', saved: 'Saved',
+    defaultProfile: 'Default Profile', defaultProfileDesc: 'Used when neither request nor app specifies one.',
+    selectProfile: 'Select a profile', disabled: '(disabled)',
+    timeout: 'Timeout (ms)', timeoutDesc: 'Maximum time to wait for upstream response.',
+    bodyLimit: 'Request Body Limit (bytes)', bodyLimitDesc: 'Maximum size of the request body.',
+    debug: 'Debug Mode', debugDesc: 'Enables detailed logging (not recommended for production).', enableDebug: 'Enable debug logging',
+  },
+
+  playground: {
+    title: 'Playground', subtitle: 'Test chat completions with your profiles',
+    profile: 'Profile', selectProfile: 'Select a profile',
+    systemPrompt: 'System Prompt', userMessage: 'User Message', placeholder: 'Type your message...',
+    stream: 'Stream', send: 'Send', running: 'Running...',
+    response: 'Response', empty: 'Send a message to see the response', error: 'Error',
+  },
+
+  dialog: { cancel: 'Cancel', confirm: 'Confirm', delete: 'Delete' },
+}

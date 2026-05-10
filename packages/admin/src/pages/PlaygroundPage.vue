@@ -2,10 +2,12 @@
 import { ref, computed, onMounted } from 'vue'
 import AppLayout from '../components/AppLayout.vue'
 import { useConfigStore } from '../stores/config'
+import { useLocale } from '../locales'
 import { api } from '../api/client'
 import { Send, Loader2 } from 'lucide-vue-next'
 
 const store = useConfigStore()
+const { messages: t } = useLocale()
 
 const selectedProfile = ref('')
 const systemPrompt = ref('You are a helpful assistant.')
@@ -19,198 +21,115 @@ const error = ref('')
 
 onMounted(() => store.loadConfig())
 
-const profileNames = computed(() => {
-  return Object.entries(store.profiles)
-    .filter(([, p]) => p.enabled)
-    .map(([name]) => name)
-})
+const profileNames = computed(() =>
+  Object.entries(store.profiles).filter(([, p]) => p.enabled).map(([name]) => name)
+)
 
 const messages = computed(() => {
   const msgs: { role: string; content: string }[] = []
-  if (systemPrompt.value) {
-    msgs.push({ role: 'system', content: systemPrompt.value })
-  }
-  if (userMessage.value) {
-    msgs.push({ role: 'user', content: userMessage.value })
-  }
+  if (systemPrompt.value) msgs.push({ role: 'system', content: systemPrompt.value })
+  if (userMessage.value) msgs.push({ role: 'user', content: userMessage.value })
   return msgs
 })
 
 async function runTest() {
   if (!selectedProfile.value || !userMessage.value) return
-
-  loading.value = true
-  response.value = ''
-  actualModel.value = ''
-  durationMs.value = 0
-  error.value = ''
+  loading.value = true; response.value = ''; actualModel.value = ''; durationMs.value = 0; error.value = ''
 
   const start = performance.now()
-
   try {
     if (useStream.value) {
-      // SSE streaming via fetch
       const resp = await fetch('/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          profile: selectedProfile.value,
-          messages: messages.value,
-          stream: true,
-        }),
+        body: JSON.stringify({ profile: selectedProfile.value, messages: messages.value, stream: true }),
       })
-
-      if (!resp.ok) {
-        const data = await resp.json()
-        throw new Error(data?.error?.message || `HTTP ${resp.status}`)
-      }
-
+      if (!resp.ok) { const data = await resp.json(); throw new Error(data?.error?.message || `HTTP ${resp.status}`) }
       const reader = resp.body?.getReader()
       if (!reader) throw new Error('No response body')
-
       const decoder = new TextDecoder()
       let buffer = ''
-
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-
         buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
-
+        const lines = buffer.split('\n'); buffer = lines.pop() || ''
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             const data = line.slice(6)
             if (data === '[DONE]') continue
             try {
               const parsed = JSON.parse(data)
-              if (parsed.choices?.[0]?.delta?.content) {
-                response.value += parsed.choices[0].delta.content
-              }
-              if (parsed.model) {
-                actualModel.value = parsed.model
-              }
-            } catch { /* skip malformed SSE */ }
+              if (parsed.choices?.[0]?.delta?.content) response.value += parsed.choices[0].delta.content
+              if (parsed.model) actualModel.value = parsed.model
+            } catch { /* skip */ }
           }
         }
       }
     } else {
-      // Non-streaming
       const resp = await fetch('/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          profile: selectedProfile.value,
-          messages: messages.value,
-          stream: false,
-        }),
+        body: JSON.stringify({ profile: selectedProfile.value, messages: messages.value, stream: false }),
       })
-
-      if (!resp.ok) {
-        const data = await resp.json()
-        throw new Error(data?.error?.message || `HTTP ${resp.status}`)
-      }
-
+      if (!resp.ok) { const data = await resp.json(); throw new Error(data?.error?.message || `HTTP ${resp.status}`) }
       const data = await resp.json()
       response.value = data.choices?.[0]?.message?.content || JSON.stringify(data, null, 2)
       actualModel.value = data.model || ''
     }
-  } catch (e) {
-    error.value = (e as Error).message
-  } finally {
-    durationMs.value = Math.round(performance.now() - start)
-    loading.value = false
-  }
+  } catch (e) { error.value = (e as Error).message }
+  finally { durationMs.value = Math.round(performance.now() - start); loading.value = false }
 }
 </script>
 
 <template>
   <AppLayout>
-    <h2 class="text-lg font-semibold text-gray-900">Playground</h2>
-    <p class="text-sm text-gray-500 mt-0.5">Test chat completions with your profiles</p>
+    <h2 class="text-lg font-semibold text-gray-900">{{ t.playground.title }}</h2>
+    <p class="text-sm text-gray-500 mt-0.5">{{ t.playground.subtitle }}</p>
 
     <div class="mt-6 grid grid-cols-2 gap-6" style="min-height: 60vh">
-      <!-- Input Side -->
       <div class="space-y-4">
-        <!-- Profile Select -->
         <div>
-          <label class="block text-xs font-medium text-gray-600 mb-1">Profile</label>
-          <select
-            v-model="selectedProfile"
-            class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-gray-900"
-          >
-            <option value="" disabled>Select a profile</option>
+          <label class="block text-xs font-medium text-gray-600 mb-1">{{ t.playground.profile }}</label>
+          <select v-model="selectedProfile" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-gray-900">
+            <option value="" disabled>{{ t.playground.selectProfile }}</option>
             <option v-for="name in profileNames" :key="name" :value="name">{{ name }}</option>
           </select>
         </div>
-
-        <!-- System Prompt -->
         <div>
-          <label class="block text-xs font-medium text-gray-600 mb-1">System Prompt</label>
-          <textarea
-            v-model="systemPrompt"
-            rows="2"
-            class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-gray-900 font-mono resize-none"
-          />
+          <label class="block text-xs font-medium text-gray-600 mb-1">{{ t.playground.systemPrompt }}</label>
+          <textarea v-model="systemPrompt" rows="2" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-gray-900 font-mono resize-none" />
         </div>
-
-        <!-- User Message -->
         <div>
-          <label class="block text-xs font-medium text-gray-600 mb-1">User Message</label>
-          <textarea
-            v-model="userMessage"
-            rows="4"
-            placeholder="Type your message..."
-            class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-gray-900 resize-none"
-            @keydown.ctrl.enter="runTest"
-          />
+          <label class="block text-xs font-medium text-gray-600 mb-1">{{ t.playground.userMessage }}</label>
+          <textarea v-model="userMessage" rows="4" :placeholder="t.playground.placeholder" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-gray-900 resize-none" @keydown.ctrl.enter="runTest" />
         </div>
-
-        <!-- Options -->
         <div class="flex items-center gap-4">
           <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
-            <input v-model="useStream" type="checkbox" class="rounded border-gray-300" />
-            Stream
+            <input v-model="useStream" type="checkbox" class="rounded border-gray-300" />{{ t.playground.stream }}
           </label>
-          <button
-            @click="runTest"
-            :disabled="loading || !selectedProfile || !userMessage"
-            class="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
+          <button @click="runTest" :disabled="loading || !selectedProfile || !userMessage" class="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
             <Loader2 v-if="loading" class="w-3.5 h-3.5 animate-spin" />
             <Send v-else class="w-3.5 h-3.5" />
-            {{ loading ? 'Running...' : 'Send' }}
+            {{ loading ? t.playground.running : t.playground.send }}
           </button>
         </div>
       </div>
 
-      <!-- Response Side -->
       <div class="bg-white border border-gray-200 rounded p-4 shadow-subtle overflow-auto">
         <div class="flex items-center justify-between mb-3">
-          <h3 class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Response</h3>
+          <h3 class="text-xs font-semibold text-gray-600 uppercase tracking-wide">{{ t.playground.response }}</h3>
           <div v-if="durationMs" class="text-xs text-gray-400">
             {{ durationMs }}ms
             <span v-if="actualModel" class="ml-2 text-gray-500">{{ actualModel }}</span>
           </div>
         </div>
-
-        <div v-if="error" class="text-sm text-red-600 bg-red-50 border border-red-200 rounded p-3">
-          {{ error }}
-        </div>
-
+        <div v-if="error" class="text-sm text-red-600 bg-red-50 border border-red-200 rounded p-3">{{ error }}</div>
         <div v-else-if="loading && useStream" class="text-sm text-gray-700 whitespace-pre-wrap">
-          {{ response }}
-          <span class="inline-block w-2 h-4 bg-gray-400 animate-pulse ml-0.5 align-middle" />
+          {{ response }}<span class="inline-block w-2 h-4 bg-gray-400 animate-pulse ml-0.5 align-middle" />
         </div>
-
-        <div v-else-if="!loading && response" class="text-sm text-gray-700 whitespace-pre-wrap">
-          {{ response }}
-        </div>
-
-        <div v-else-if="!loading && !error" class="text-sm text-gray-400 text-center py-12">
-          Send a message to see the response
-        </div>
+        <div v-else-if="!loading && response" class="text-sm text-gray-700 whitespace-pre-wrap">{{ response }}</div>
+        <div v-else-if="!loading && !error" class="text-sm text-gray-400 text-center py-12">{{ t.playground.empty }}</div>
       </div>
     </div>
   </AppLayout>

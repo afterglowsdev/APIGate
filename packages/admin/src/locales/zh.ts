@@ -1,0 +1,102 @@
+export default {
+  app: { title: 'LLM 网关', subtitle: '管理控制台' },
+  save: '保存', cancel: '取消', delete: '删除', edit: '编辑', create: '新建', confirm: '确认',
+  loading: '加载中...', noData: '暂无数据', saving: '保存中...', more: '更多',
+
+  sidebar: {
+    dashboard: '仪表盘', profiles: '模型档位', apps: '应用接入', devices: '设备管理',
+    settings: '系统设置', playground: '调试工具', logout: '退出登录',
+  },
+
+  login: {
+    title: '网关管理后台', subtitle: '登录以管理网关配置',
+    password: '管理员密码', placeholder: '请输入管理员密码', submit: '登录', submitting: '登录中...',
+  },
+
+  dashboard: {
+    title: '仪表盘', subtitle: '网关状态概览',
+    profiles: '模型档位', profilesDesc: '已配置的模型档位数量',
+    apps: '应用接入', appsDesc: '已注册的应用数量',
+    devices: '设备', devicesDesc: '自动发现的设备总数',
+    defaultProfile: '默认档位', defaultProfileDesc: '未指定档位时的默认选择',
+    timeout: '超时时间', timeoutDesc: '上游请求超时设定',
+    profilesList: '模型档位列表', appsList: '应用列表',
+    models: '个模型', enabled: '已启用', disabled: '已禁用',
+  },
+
+  profiles: {
+    title: '模型档位', subtitle: '定义模型池，支持加权随机选择',
+    newProfile: '新建档位', namePlaceholder: '档位名称（如 app-fast）',
+    create: '创建', noProfiles: '暂无模型档位，请创建一个',
+    description: '描述', maxTokens: '最大 Token 数', temperature: '温度参数',
+    models: '模型列表', modelName: '模型名称', weight: '权重', addModel: '添加模型',
+    enabled: '已启用', notEnabled: '未启用', missing: '缺少',
+    deleteTitle: '删除档位', deleteMsg: '确定要删除档位"{name}"吗？此操作不可撤销。',
+  },
+
+  apps: {
+    title: '应用接入', subtitle: '管理接入网关的应用程序。设备会自动发现，无需手动为每个用户创建 Token。',
+    newApp: '新建应用',
+    appId: '应用 ID', appIdPlaceholder: '如 desktop-app',
+    name: '应用名称', namePlaceholder: '显示名称',
+    enabled: '已启用', disabled: '已禁用',
+    appSecret: '接入密钥（可选）', genSecret: '生成',
+    requireAppSecret: '要求密钥',
+    requireSecretDesc: '开启后请求必须携带 X-App-Secret 或 Authorization Bearer',
+    autoRegisterDevices: '自动注册设备',
+    autoRegisterDesc: '新设备首次请求时自动录入系统',
+    allowAnonymousDevices: '允许匿名设备',
+    allowAnonymousDesc: '未注册设备也可通过（当关闭自动注册时）',
+    defaultProfile: '默认档位',
+    allowedProfiles: '允许的档位',
+    perDeviceDailyQuota: '每设备每日额度',
+    perDeviceMonthlyQuota: '每设备每月额度',
+    perDeviceRateLimitPerMinute: '每设备限流 (次/分钟)',
+    perIpRateLimitPerMinute: '每 IP 限流 (次/分钟)',
+    globalRateLimitPerMinute: '全局限流 (次/分钟)',
+    minAppVersion: '最低版本要求',
+    allowedHours: '允许使用时段',
+    identifiers: '识别码配置',
+    identifiersDesc: '配置客户端需要携带的 Header 及用途。按列表顺序评估，第一个匹配的 device/user 类型将作为限流主键。',
+    addIdentifier: '添加识别码',
+    noIdentifiers: '未配置识别码',
+    required: '必填',
+    track: '用于跟踪',
+    noApps: '暂无应用，请创建一个',
+    deleteTitle: '删除应用', deleteMsg: '确定要删除应用"{name}"吗？其设备数据将保留。',
+    missingAppId: '缺少应用 ID', missingProfile: '缺少允许的档位',
+  },
+
+  devices: {
+    title: '设备管理', subtitle: '自动发现的设备。设备由客户端首次请求时自动注册。',
+    appId: '应用 ID', deviceId: '设备 ID', status: '状态', appVersion: '版本',
+    platform: '平台', firstSeen: '首次出现', lastSeen: '最近出现', ipHash: 'IP 哈希',
+    note: '备注', todayRequests: '今日请求', monthRequests: '本月请求',
+    active: '活跃', blocked: '已封禁',
+    block: '封禁', unblock: '解封', addNote: '添加备注',
+    search: '搜索设备 ID 或备注...',
+    filterApp: '筛选应用', filterStatus: '筛选状态', all: '全部',
+    blockTitle: '封禁设备', blockMsg: '确定要封禁设备"{id}"吗？它将无法再发送请求。',
+    unblockTitle: '解封设备', unblockMsg: '确定要解封设备"{id}"吗？',
+    noDevices: '暂无设备数据',
+  },
+
+  settings: {
+    title: '系统设置', subtitle: '网关全局配置', saved: '已保存',
+    defaultProfile: '默认档位', defaultProfileDesc: '请求和应用均未指定档位时使用。',
+    selectProfile: '请选择档位', disabled: '（已禁用）',
+    timeout: '超时时间（毫秒）', timeoutDesc: '等待上游响应的最长时间。',
+    bodyLimit: '请求体大小限制（字节）', bodyLimitDesc: '允许的最大请求体大小。',
+    debug: '调试模式', debugDesc: '启用详细日志（生产环境不建议开启）。', enableDebug: '启用调试日志',
+  },
+
+  playground: {
+    title: '调试工具', subtitle: '用你的档位配置测试聊天补全',
+    profile: '选择档位', selectProfile: '请选择档位',
+    systemPrompt: '系统提示词', userMessage: '用户消息', placeholder: '输入你的消息...',
+    stream: '流式输出', send: '发送', running: '运行中...',
+    response: '响应结果', empty: '发送消息以查看响应', error: '错误',
+  },
+
+  dialog: { cancel: '取消', confirm: '确认', delete: '删除' },
+}

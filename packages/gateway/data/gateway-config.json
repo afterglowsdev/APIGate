@@ -6,7 +6,7 @@
   "profiles": {
     "app-fast": {
       "enabled": true,
-      "description": "Fast affordable models",
+      "description": "Fast affordable models / 快速便宜模型",
       "models": [
         {
           "name": "gpt-4o-mini",
@@ -22,7 +22,7 @@
     },
     "app-smart": {
       "enabled": true,
-      "description": "High quality models",
+      "description": "High quality models / 高质量模型",
       "models": [
         {
           "name": "claude-3-5-sonnet-latest",
@@ -37,19 +37,51 @@
       "temperature": 0.7
     }
   },
-  "clients": [
+  "apps": [
     {
-      "id": "desktop-app",
+      "appId": "desktop-app",
       "name": "Desktop App",
-      "token": "client-test-token",
       "enabled": true,
+      "requireAppSecret": false,
+      "appSecret": "",
+      "identifiers": [
+        {
+          "header": "X-Device-Id",
+          "type": "device",
+          "required": true,
+          "track": true
+        },
+        {
+          "header": "user_id",
+          "type": "user",
+          "required": false,
+          "track": true
+        },
+        {
+          "header": "X-App-Version",
+          "type": "custom",
+          "required": false,
+          "track": false
+        },
+        {
+          "header": "X-Platform",
+          "type": "custom",
+          "required": false,
+          "track": false
+        }
+      ],
+      "allowAnonymousDevices": true,
+      "autoRegisterDevices": true,
+      "defaultProfile": "app-fast",
       "allowedProfiles": [
         "app-fast",
         "app-smart"
       ],
-      "dailyQuota": 1000,
-      "monthlyQuota": 30000,
-      "rateLimitPerMinute": 30
+      "perDeviceDailyQuota": 1000,
+      "perDeviceMonthlyQuota": 30000,
+      "perDeviceRateLimitPerMinute": 30,
+      "perIpRateLimitPerMinute": 60,
+      "globalRateLimitPerMinute": 300
     }
   ]
 }

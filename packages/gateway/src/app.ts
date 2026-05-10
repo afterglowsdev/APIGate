@@ -1,9 +1,26 @@
+/**
+ * LLM API Secure Forwarding Gateway — Core App Factory
+ * LLM API 安全转发网关 — 核心应用工厂
+ *
+ * Assembles stores, services, and routes into a complete Hono application.
+ * Different platforms adapt by injecting different store implementations.
+ * 将存储、服务、路由组装为完整的 Hono 应用。不同运行平台通过传入不同的 store 实现来适配。
+ *
+ * Request pipeline / 请求处理流程：
+ * Request → CORS → global timing/logging → route matching → middleware chain → response
+ *                                                               ↓
+ *    POST /v1/chat/completions:  requestLogger → auth → quota → rate-limit → model-select → proxy
+ *    /api/admin/*:               adminAuth → handler → JSON response
+ *    /admin/*:                   SPA static files or proxy to Vite dev server
+ */
+
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import type { GatewayVariables, GatewayBindings } from './types/env.js'
 import type { IConfigStore } from './interfaces/config-store.js'
 import type { IUsageStore } from './interfaces/usage-store.js'
 import type { IRateLimitStore } from './interfaces/rate-limit-store.js'
+import type { IDeviceStore } from './interfaces/device-store.js'
 import { createLogger } from './services/logger.js'
 import type { Logger, LogLevel, LogFormat } from './services/logger.js'
 import { registerHealthRoute } from './routes/health.js'
@@ -18,6 +35,7 @@ export interface GatewayOptions {
   configStore: IConfigStore
   usageStore: IUsageStore
   rateLimitStore: IRateLimitStore
+  deviceStore: IDeviceStore
   newApiBaseUrl: string
   newApiToken: string
   adminPassword: string
@@ -33,6 +51,7 @@ export function createApp(options: GatewayOptions): Hono<{ Variables: GatewayVar
     configStore,
     usageStore,
     rateLimitStore,
+    deviceStore,
     newApiBaseUrl,
     newApiToken,
     adminPassword,
@@ -93,8 +112,8 @@ export function createApp(options: GatewayOptions): Hono<{ Variables: GatewayVar
 
   // Register routes
   registerHealthRoute(app)
-  registerProxyRoute(app, configStore, usageStore, rateLimitStore, logger, newApiToken, newApiBaseUrl)
-  registerAdminRoutes(app, configStore, logger, adminPassword, adminJwtSecret, newApiToken, newApiBaseUrl)
+  registerProxyRoute(app, configStore, usageStore, rateLimitStore, deviceStore, logger, newApiToken, newApiBaseUrl)
+  registerAdminRoutes(app, configStore, deviceStore, logger, adminPassword, adminJwtSecret, newApiToken, newApiBaseUrl)
   registerAdminSpaRoutes(app, logger, isDev, adminDistPath)
 
   // Fallback 404

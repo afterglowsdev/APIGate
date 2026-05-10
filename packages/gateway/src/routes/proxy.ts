@@ -3,6 +3,7 @@ import type { GatewayVariables, GatewayBindings } from '../types/env.js'
 import type { IConfigStore } from '../interfaces/config-store.js'
 import type { IUsageStore } from '../interfaces/usage-store.js'
 import type { IRateLimitStore } from '../interfaces/rate-limit-store.js'
+import type { IDeviceStore } from '../interfaces/device-store.js'
 import type { Logger } from '../services/logger.js'
 import { createAuthMiddleware } from '../services/auth.js'
 import { createQuotaMiddleware } from '../services/quota.js'
@@ -19,11 +20,12 @@ export function registerProxyRoute(
   configStore: IConfigStore,
   usageStore: IUsageStore,
   rateLimitStore: IRateLimitStore,
+  deviceStore: IDeviceStore,
   logger: Logger,
   newApiToken: string,
   newApiBaseUrl: string,
 ) {
-  const auth = createAuthMiddleware(configStore, logger)
+  const auth = createAuthMiddleware(configStore, deviceStore, logger)
   const quota = createQuotaMiddleware(usageStore, configStore, logger)
   const rateLimit = createRateLimitMiddleware(rateLimitStore, logger)
   const modelSelect = createModelSelectMiddleware(configStore, logger)
@@ -37,11 +39,14 @@ export function registerProxyRoute(
       requestId,
       method: c.req.method,
       path: c.req.path,
+      appId: c.req.header('X-App-Id') || '-',
+      deviceId: c.req.header('X-Device-Id') || '-',
       ipHash: hashIp(ip),
     })
     await next()
   }
 
-  // Chain: requestLogger -> auth -> quota -> rate-limit -> model-select -> proxy
+  // Chain: requestLogger → auth → quota → rate-limit → model-select → proxy
+  // 中间件链：日志 → 鉴权 → 额度 → 限流 → 模型选择 → 代理
   app.post('/v1/chat/completions', requestLogger, auth, quota, rateLimit, modelSelect, (c) => proxyHandler(c))
 }

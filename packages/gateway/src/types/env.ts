@@ -1,11 +1,15 @@
-import type { ClientConfig, GatewayConfig, ModelProfile } from './config.js'
+import type { AppConfig, GatewayConfig, ModelProfile } from './config.js'
+import type { DeviceRecord } from './device.js'
 
-/** Variables set on the Hono context by middleware */
+/** Variables set on the Hono context by middleware / 中间件注入的上下文变量 */
 export interface GatewayVariables {
   requestId: string
-  client?: ClientConfig
+  app?: AppConfig
+  device?: DeviceRecord
+  deviceId?: string
   selectedModel?: string
   selectedProfile?: ModelProfile
+  selectedProfileName?: string
   requestStartMs: number
 }
 
