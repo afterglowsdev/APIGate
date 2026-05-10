@@ -43,7 +43,6 @@ export interface GatewayOptions {
   logLevel?: LogLevel
   logFormat?: LogFormat
   isDev?: boolean
-  adminDistPath?: string
 }
 
 export function createApp(options: GatewayOptions): Hono<{ Variables: GatewayVariables; Bindings: GatewayBindings }> {
@@ -59,7 +58,6 @@ export function createApp(options: GatewayOptions): Hono<{ Variables: GatewayVar
     logLevel = 'info',
     logFormat = 'pretty',
     isDev = false,
-    adminDistPath,
   } = options
 
   const logger = createLogger(logLevel, logFormat)
@@ -114,7 +112,7 @@ export function createApp(options: GatewayOptions): Hono<{ Variables: GatewayVar
   registerHealthRoute(app)
   registerProxyRoute(app, configStore, usageStore, rateLimitStore, deviceStore, logger, newApiToken, newApiBaseUrl)
   registerAdminRoutes(app, configStore, deviceStore, logger, adminPassword, adminJwtSecret, newApiToken, newApiBaseUrl)
-  registerAdminSpaRoutes(app, logger, isDev, adminDistPath)
+  registerAdminSpaRoutes(app, logger, isDev)
 
   // Fallback 404
   app.all('*', (c) => {

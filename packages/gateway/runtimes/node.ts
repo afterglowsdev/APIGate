@@ -144,7 +144,9 @@ async function main() {
   const adminJwtSecret = secrets.ADMIN_JWT_SECRET || 'gateway-jwt-secret-change-me'
   const logLevel = (secrets.LOG_LEVEL || 'info') as LogLevel
   const logFormat: LogFormat = secrets.NODE_ENV === 'production' ? 'json' : 'pretty'
-  const isDev = secrets.NODE_ENV !== 'production'
+  // Only treat as dev when explicitly set to "development", not as a default fallback
+  // 仅在明确设为 "development" 时才进入开发模式，避免生产环境误判
+  const isDev = secrets.NODE_ENV === 'development'
 
   if (!secrets.NEW_API_TOKEN) {
     console.warn('[gateway] WARNING: NEW_API_TOKEN not set. Set it in secret.json or environment variable.')
@@ -167,7 +169,6 @@ async function main() {
     logLevel,
     logFormat,
     isDev,
-    adminDistPath: isDev ? undefined : resolve(process.cwd(), '../admin/dist'),
   })
 
   const port = parseInt(process.env.PORT || '3000', 10)
