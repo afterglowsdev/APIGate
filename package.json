@@ -8,5 +8,8 @@
     "build": "pnpm --filter @afterglowsdev/admin build && pnpm --filter @afterglowsdev/gateway build",
     "start": "pnpm --filter @afterglowsdev/gateway start",
     "typecheck": "pnpm --filter @afterglowsdev/gateway typecheck"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "vue-demi"]
   }
 }

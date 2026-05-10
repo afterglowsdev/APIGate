@@ -4,9 +4,9 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch runtimes/node.ts",
-    "build": "tsc",
+    "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "start": "node dist/runtimes/node.js"
+    "start": "tsx runtimes/node.ts"
   },
   "dependencies": {
     "hono": "^4.7.0",
