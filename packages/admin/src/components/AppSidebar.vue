@@ -23,7 +23,7 @@ function isActive(path: string) {
 </script>
 
 <template>
-  <aside class="w-56 bg-gray-950 text-gray-300 flex flex-col min-h-screen">
+  <aside class="w-56 bg-gray-950 text-gray-300 flex flex-col h-full">
     <div class="px-5 py-4 border-b border-gray-800">
       <h1 class="text-sm font-semibold text-white tracking-wide">{{ t.app.title }}</h1>
       <p class="text-xs text-gray-500 mt-0.5">{{ t.app.subtitle }}</p>
