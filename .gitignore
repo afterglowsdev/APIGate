@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+*.local
+data/gateway-config.json
+data/gateway-usage.json
+secret.json
+.cache/
+*.tsbuildinfo

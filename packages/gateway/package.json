@@ -1,0 +1,21 @@
+{
+  "name": "@llm-gateway/gateway",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch runtimes/node.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/runtimes/node.js"
+  },
+  "dependencies": {
+    "hono": "^4.7.0",
+    "jose": "^5.9.0"
+  },
+  "devDependencies": {
+    "@hono/node-server": "^1.13.0",
+    "@types/node": "^20.16.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

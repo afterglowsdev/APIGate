@@ -1,0 +1,115 @@
+import { Hono } from 'hono'
+import { cors } from 'hono/cors'
+import type { GatewayVariables, GatewayBindings } from './types/env.js'
+import type { IConfigStore } from './interfaces/config-store.js'
+import type { IUsageStore } from './interfaces/usage-store.js'
+import type { IRateLimitStore } from './interfaces/rate-limit-store.js'
+import { createLogger } from './services/logger.js'
+import type { Logger, LogLevel, LogFormat } from './services/logger.js'
+import { registerHealthRoute } from './routes/health.js'
+import { registerProxyRoute } from './routes/proxy.js'
+import { registerAdminRoutes } from './routes/admin.js'
+import { registerAdminSpaRoutes } from './routes/admin-spa.js'
+import { errorToResponse } from './utils/errors.js'
+import { GatewayError } from './types/errors.js'
+import { nowMs } from './utils/time.js'
+
+export interface GatewayOptions {
+  configStore: IConfigStore
+  usageStore: IUsageStore
+  rateLimitStore: IRateLimitStore
+  newApiBaseUrl: string
+  newApiToken: string
+  adminPassword: string
+  adminJwtSecret: string
+  logLevel?: LogLevel
+  logFormat?: LogFormat
+  isDev?: boolean
+  adminDistPath?: string
+}
+
+export function createApp(options: GatewayOptions): Hono<{ Variables: GatewayVariables; Bindings: GatewayBindings }> {
+  const {
+    configStore,
+    usageStore,
+    rateLimitStore,
+    newApiBaseUrl,
+    newApiToken,
+    adminPassword,
+    adminJwtSecret,
+    logLevel = 'info',
+    logFormat = 'pretty',
+    isDev = false,
+    adminDistPath,
+  } = options
+
+  const logger = createLogger(logLevel, logFormat)
+
+  const app = new Hono<{ Variables: GatewayVariables; Bindings: GatewayBindings }>()
+
+  // Global CORS for admin API
+  app.use(
+    '/api/admin/*',
+    cors({
+      origin: isDev ? ['http://localhost:5173'] : ['*'],
+      credentials: true,
+    }),
+  )
+
+  // Global request timing and logging
+  app.use('*', async (c, next) => {
+    const start = nowMs()
+    c.set('requestStartMs', start)
+    await next()
+    const durationMs = nowMs() - start
+    logger.info('Response sent', {
+      method: c.req.method,
+      path: c.req.path,
+      status: c.res.status,
+      durationMs,
+    })
+  })
+
+  // Global error handler
+  app.onError((err, c) => {
+    logger.error('Unhandled error', {
+      path: c.req.path,
+      error: err instanceof Error ? err.message : String(err),
+      stack: isDev && err instanceof Error ? err.stack : undefined,
+    })
+    return errorToResponse(c, err)
+  })
+
+  // 404 for unknown API paths
+  app.use('/v1/*', async (c, next) => {
+    await next()
+    if (!c.res || c.res.status === 404) {
+      return c.json(
+        { error: { code: 'not_found', message: 'Not found' } },
+        404,
+      )
+    }
+  })
+
+  // Register routes
+  registerHealthRoute(app)
+  registerProxyRoute(app, configStore, usageStore, rateLimitStore, logger, newApiToken, newApiBaseUrl)
+  registerAdminRoutes(app, configStore, logger, adminPassword, adminJwtSecret, newApiToken, newApiBaseUrl)
+  registerAdminSpaRoutes(app, logger, isDev, adminDistPath)
+
+  // Fallback 404
+  app.all('*', (c) => {
+    return c.json(
+      { error: { code: 'not_found', message: 'Not found' } },
+      404 as never,
+    )
+  })
+
+  logger.info('Gateway app created', {
+    newApiBaseUrl,
+    logLevel,
+    isDev,
+  })
+
+  return app
+}

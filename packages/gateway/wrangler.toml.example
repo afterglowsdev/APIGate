@@ -1,0 +1,24 @@
+# Cloudflare Workers configuration
+# Copy to wrangler.toml and fill in your values
+
+name = "llm-api-gateway"
+main = "src/runtimes/cloudflare-worker.ts"
+compatibility_date = "2025-01-01"
+
+[vars]
+NEW_API_BASE_URL = "https://your-newapi.example.com"
+LOG_LEVEL = "info"
+
+# Secrets (set via wrangler secret put)
+# NEW_API_TOKEN
+# ADMIN_PASSWORD
+# ADMIN_JWT_SECRET
+
+# Optional: KV namespaces for persistent storage
+# [[kv_namespaces]]
+# binding = "CONFIG_KV"
+# id = "your-kv-namespace-id"
+
+# [[kv_namespaces]]
+# binding = "USAGE_KV"
+# id = "your-kv-namespace-id"

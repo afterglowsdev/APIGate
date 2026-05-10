@@ -1,0 +1,21 @@
+[build]
+  command = "pnpm build"
+  publish = "dist"
+
+[functions]
+  node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/v1/chat/completions"
+  to = "/.netlify/functions/gateway"
+  status = 200
+
+[[redirects]]
+  from = "/health"
+  to = "/.netlify/functions/gateway"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/*"
+  to = "/.netlify/functions/gateway"
+  status = 200

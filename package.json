@@ -1,0 +1,12 @@
+{
+  "name": "llm-gateway",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @llm-gateway/gateway dev",
+    "dev:admin": "pnpm --filter @llm-gateway/admin dev",
+    "dev:all": "pnpm run --parallel --filter @llm-gateway/gateway --filter @llm-gateway/admin dev",
+    "build": "pnpm --filter @llm-gateway/admin build && pnpm --filter @llm-gateway/gateway build",
+    "start": "pnpm --filter @llm-gateway/gateway start",
+    "typecheck": "pnpm --filter @llm-gateway/gateway typecheck"
+  }
+}
