@@ -31,6 +31,7 @@ export default {
     description: '描述', maxTokens: '最大 Token 数', temperature: '温度参数',
     models: '模型列表', modelName: '模型名称', weight: '权重', addModel: '添加模型',
     enabled: '已启用', notEnabled: '未启用', missing: '缺少',
+    fetchUpstream: '从上游获取模型', upstreamModels: '上游可用模型',
     deleteTitle: '删除档位', deleteMsg: '确定要删除档位"{name}"吗？此操作不可撤销。',
   },
 

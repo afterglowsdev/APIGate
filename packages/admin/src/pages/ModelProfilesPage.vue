@@ -4,8 +4,9 @@ import AppLayout from '../components/AppLayout.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import { useConfigStore } from '../stores/config'
 import { useLocale } from '../locales'
+import { api } from '../api/client'
 import type { ProfileData } from '../api/client'
-import { Plus, Trash2, Save, AlertTriangle } from 'lucide-vue-next'
+import { Plus, Trash2, Save, AlertTriangle, Download, X } from 'lucide-vue-next'
 
 const store = useConfigStore()
 const { messages: t } = useLocale()
@@ -16,6 +17,12 @@ const deleteTarget = ref<string | null>(null)
 
 const form = ref<ProfileData>({ enabled: false, models: [], max_tokens: 2048, temperature: 0.7, description: '' })
 
+// Upstream model list / 上游模型列表
+const upstreamModels = ref<string[]>([])
+const upstreamLoading = ref(false)
+const upstreamError = ref('')
+const showUpstream = ref(false)
+
 onMounted(() => store.loadConfig())
 
 const profileList = computed(() => Object.entries(store.profiles))
@@ -25,12 +32,13 @@ function startEdit(name: string) {
   form.value = JSON.parse(JSON.stringify(store.profiles[name]))
 }
 
-function cancelEdit() { editingProfile.value = null }
+function cancelEdit() { editingProfile.value = null; showUpstream.value = false }
 
 async function saveProfile(name: string) {
   store.updateProfile(name, form.value)
   await store.saveConfig()
   editingProfile.value = null
+  showUpstream.value = false
 }
 
 function startNew() { showNewForm.value = true; newProfileName.value = '' }
@@ -52,6 +60,28 @@ async function confirmDelete() {
 
 function addModel() { form.value.models.push({ name: '', weight: 1 }) }
 function removeModel(index: number) { form.value.models.splice(index, 1) }
+
+async function fetchUpstreamModels() {
+  upstreamLoading.value = true; upstreamError.value = ''; showUpstream.value = true
+  try {
+    const res = await api.getUpstreamModels()
+    if (res.ok && res.models) {
+      upstreamModels.value = res.models
+    } else {
+      upstreamError.value = res.error || 'Failed to fetch models'
+    }
+  } catch (e) {
+    upstreamError.value = (e as Error).message
+  }
+  upstreamLoading.value = false
+}
+
+function addUpstreamModel(name: string) {
+  // Don't add duplicate / 不重复添加
+  if (!form.value.models.some(m => m.name === name)) {
+    form.value.models.push({ name, weight: 1 })
+  }
+}
 
 function profileStatus(profile: ProfileData): { label: string; class: string } {
   if (!profile.enabled) return { label: t.value.profiles.notEnabled, class: 'text-gray-400' }
@@ -145,6 +175,30 @@ async function toggleEnabled(name: string) {
               </div>
             </div>
             <button @click="addModel" class="mt-2 text-xs text-gray-500 hover:text-gray-800 flex items-center gap-1"><Plus class="w-3 h-3" />{{ t.profiles.addModel }}</button>
+            <button @click="fetchUpstreamModels" :disabled="upstreamLoading" class="mt-2 ml-2 text-xs text-blue-500 hover:text-blue-700 flex items-center gap-1">
+              <Download class="w-3 h-3" />{{ upstreamLoading ? t.loading : t.profiles.fetchUpstream }}
+            </button>
+          </div>
+
+          <!-- Upstream model picker / 上游模型列表 -->
+          <div v-if="showUpstream" class="bg-white border border-blue-200 rounded p-3">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-medium text-gray-700">{{ t.profiles.upstreamModels }}</span>
+              <button @click="showUpstream = false" class="text-gray-400 hover:text-gray-600"><X class="w-3.5 h-3.5" /></button>
+            </div>
+            <div v-if="upstreamLoading" class="text-xs text-gray-400">{{ t.loading }}</div>
+            <div v-else-if="upstreamError" class="text-xs text-red-500">{{ upstreamError }}</div>
+            <div v-else class="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+              <button v-for="m in upstreamModels" :key="m"
+                @click="addUpstreamModel(m)"
+                :class="['px-2 py-0.5 text-xs rounded border transition-colors',
+                  form.models.some(fm => fm.name === m)
+                    ? 'bg-green-50 border-green-300 text-green-700 cursor-default'
+                    : 'bg-white border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-600']">
+                {{ m }}
+                <span v-if="form.models.some(fm => fm.name === m)" class="ml-1">✓</span>
+              </button>
+            </div>
           </div>
 
           <div class="flex items-center gap-2 pt-2 border-t border-gray-100">

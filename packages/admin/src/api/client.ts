@@ -122,4 +122,7 @@ export const api = {
   blockDevice(appId: string, deviceId: string) { return request<{ ok: boolean }>(`/devices/${appId}/${deviceId}/block`, { method: 'POST' }) },
   unblockDevice(appId: string, deviceId: string) { return request<{ ok: boolean }>(`/devices/${appId}/${deviceId}/unblock`, { method: 'POST' }) },
   updateDeviceNote(appId: string, deviceId: string, note: string) { return request<{ ok: boolean }>(`/devices/${appId}/${deviceId}/note`, { method: 'PUT', body: JSON.stringify({ note }) }) },
+
+  // Upstream models / 上游模型列表
+  getUpstreamModels() { return request<{ ok: boolean; models?: string[]; error?: string }>('/upstream-models') },
 }

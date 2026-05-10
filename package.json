@@ -1,12 +1,12 @@
 {
-  "name": "llm-gateway",
+  "name": "afterglowsdev-gateway",
   "private": true,
   "scripts": {
-    "dev": "pnpm --filter @llm-gateway/gateway dev",
-    "dev:admin": "pnpm --filter @llm-gateway/admin dev",
-    "dev:all": "pnpm run --parallel --filter @llm-gateway/gateway --filter @llm-gateway/admin dev",
-    "build": "pnpm --filter @llm-gateway/admin build && pnpm --filter @llm-gateway/gateway build",
-    "start": "pnpm --filter @llm-gateway/gateway start",
-    "typecheck": "pnpm --filter @llm-gateway/gateway typecheck"
+    "dev": "pnpm --filter @afterglowsdev/gateway dev",
+    "dev:admin": "pnpm --filter @afterglowsdev/admin dev",
+    "dev:all": "pnpm run --parallel --filter @afterglowsdev/gateway --filter @afterglowsdev/admin dev",
+    "build": "pnpm --filter @afterglowsdev/admin build && pnpm --filter @afterglowsdev/gateway build",
+    "start": "pnpm --filter @afterglowsdev/gateway start",
+    "typecheck": "pnpm --filter @afterglowsdev/gateway typecheck"
   }
 }

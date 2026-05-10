@@ -184,6 +184,26 @@ export function registerAdminRoutes(
     return c.json({ ok: true })
   })
 
+  // ---- Fetch upstream model list / 从上游获取模型列表 ----
+  app.get('/api/admin/upstream-models', adminAuth, async (c) => {
+    try {
+      const base = newApiBaseUrl.replace(/\/+$/, '')
+      const resp = await fetch(`${base}/v1/models`, {
+        headers: { 'Authorization': `Bearer ${newApiToken}` },
+      })
+      if (!resp.ok) {
+        const text = await resp.text()
+        return c.json({ ok: false, error: `Upstream returned ${resp.status}: ${text.slice(0, 200)}` }, 502)
+      }
+      const data = await resp.json() as { data?: { id: string }[] }
+      // OpenAI-compatible: { data: [{ id: "gpt-4o-mini" }, ...] }
+      const models = (data.data || []).map((m: { id: string }) => m.id).sort()
+      return c.json({ ok: true, models })
+    } catch (err) {
+      return c.json({ ok: false, error: (err as Error).message }, 502)
+    }
+  })
+
   // ---- Test endpoint / 测试端点 ----
   app.post('/api/admin/test', adminAuth, async (c) => {
     const proxyHandler = createProxyHandler(configStore, logger, newApiToken, newApiBaseUrl)

@@ -31,6 +31,7 @@ export default {
     description: 'Description', maxTokens: 'Max Tokens', temperature: 'Temperature',
     models: 'Models', modelName: 'Model name', weight: 'Weight', addModel: 'Add model',
     enabled: 'Enabled', notEnabled: 'Disabled', missing: 'Missing',
+    fetchUpstream: 'Fetch from upstream', upstreamModels: 'Upstream models',
     deleteTitle: 'Delete Profile', deleteMsg: 'Delete profile "{name}"? This cannot be undone.',
   },
 

@@ -292,14 +292,14 @@ Admin GUI served at `http://localhost:3000/admin`. The admin path prefix can be 
 ### 2. Docker / Zeabur
 
 ```bash
-docker build -f packages/gateway/Dockerfile -t llm-gateway .
+docker build -f packages/gateway/Dockerfile -t afterglowsdev-gateway .
 docker run -p 3000:3000 \
   -e NEW_API_BASE_URL=https://your-newapi.example.com \
   -e NEW_API_TOKEN=sk-your-token \
   -e ADMIN_PASSWORD=change-me \
   -e ADMIN_JWT_SECRET=your-secret \
   -e CONFIG_STORE_TYPE=file \
-  llm-gateway
+  afterglowsdev-gateway
 ```
 
 All configuration via environment variables. For Zeabur, set the same variables in the service dashboard.
@@ -733,14 +733,14 @@ pnpm install && pnpm build && pnpm start
 ### 2. Docker / Zeabur
 
 ```bash
-docker build -f packages/gateway/Dockerfile -t llm-gateway .
+docker build -f packages/gateway/Dockerfile -t afterglowsdev-gateway .
 docker run -p 3000:3000 \
   -e NEW_API_BASE_URL=https://your-newapi.example.com \
   -e NEW_API_TOKEN=sk-your-token \
   -e ADMIN_PASSWORD=change-me \
   -e ADMIN_JWT_SECRET=your-secret \
   -e CONFIG_STORE_TYPE=file \
-  llm-gateway
+  afterglowsdev-gateway
 ```
 
 所有配置通过环境变量传入。Zeabur 在控制台设置同名环境变量即可。
