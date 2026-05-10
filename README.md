@@ -353,18 +353,20 @@ Deploy: `vercel deploy`. Deploy admin separately as a static site.
 | `ADMIN_PASSWORD` | Admin password |
 | `ADMIN_JWT_SECRET` | JWT signing secret |
 | `GATEWAY_CONFIG_JSON` | JSON config when `CONFIG_STORE_TYPE=env` (read-only) |
-| `CONFIG_STORE_TYPE` | `env` or `memory` |
+| `CONFIG_STORE_TYPE` | `netlify-blobs` (default, persistent) or `memory` |
 
 Deploy: `netlify deploy --prod`.
+
+**Storage**: Netlify Blobs provides native persistent storage — no external Redis needed. Config and device data survive cold starts. Usage and rate-limit counters still use `memory` (acceptable for single-function deployments).
 
 ### Deployment Comparison
 
 | | Node.js | Docker | CF Workers | Vercel | Netlify |
 |---|---|---|---|---|---|
-| Config persistence | file ✓ | file ✓ | KV / memory | env / redis | env / redis |
-| Admin GUI editing | ✓ | ✓ | needs KV | needs redis | needs redis |
+| Config persistence | file ✓ | file ✓ | KV / memory | env / redis | Blobs ✓ |
+| Admin GUI editing | ✓ | ✓ | needs KV | needs redis | ✓ |
 | Multi-instance rate limit | single-server | single-server | imprecise | imprecise | imprecise |
-| Complexity | low | low | medium | medium | medium |
+| Complexity | low | low | medium | medium | low |
 
 ## Configuration
 
@@ -375,6 +377,7 @@ Deploy: `netlify deploy --prod`.
 | Memory | ✓ | ✓ | ✓ | ✓ |
 | File (Node.js) | ✓ | ✓ | — | ✓ |
 | Env var (read-only) | ✓ | — | — | — |
+| Netlify Blobs | ✓ | — | — | ✓ |
 | Redis | planned | planned | planned | — |
 
 Set via environment or `secret.json`:
@@ -386,7 +389,7 @@ RATE_LIMIT_STORE_TYPE=memory
 DEVICE_STORE_TYPE=memory
 ```
 
-**Note**: Memory stores are lost on restart. Use file stores for single-server Node.js. Redis for serverless.
+**Note**: Memory stores are lost on restart. Use file stores for single-server Node.js. Netlify uses Blobs natively (no external service). Redis for other serverless platforms.
 
 ### Validation Strategy
 
@@ -430,7 +433,7 @@ packages/
       interfaces/   # Store interfaces
       services/     # Auth, quota, rate-limit, proxy, etc.
       routes/       # API route handlers
-      stores/       # Storage implementations (memory, file, env)
+      stores/       # Storage implementations (memory, file, env, netlify-blobs)
       utils/        # Utility functions
     runtimes/       # Platform entry points (node, cloudflare, vercel, netlify)
   admin/            # Frontend (Vue 3 + Vite + Tailwind)
@@ -791,18 +794,20 @@ CONFIG_STORE_TYPE = "memory"
 | `ADMIN_PASSWORD` | 管理员密码 |
 | `ADMIN_JWT_SECRET` | JWT 签名密钥 |
 | `GATEWAY_CONFIG_JSON` | 当 `CONFIG_STORE_TYPE=env` 时的 JSON 配置（只读） |
-| `CONFIG_STORE_TYPE` | `env` 或 `memory` |
+| `CONFIG_STORE_TYPE` | `netlify-blobs`（默认，持久化）或 `memory` |
 
 部署：`netlify deploy --prod`。
+
+**存储说明**：Netlify Blobs 提供原生持久化存储 — 无需外部 Redis。配置和设备数据冷启动后不丢失。用量和限流计数器仍使用 `memory`（单函数部署可接受）。
 
 ### 部署方式对比
 
 | | Node.js | Docker | CF Workers | Vercel | Netlify |
 |---|---|---|---|---|---|
-| 配置持久化 | file ✓ | file ✓ | KV / memory | env / redis | env / redis |
-| 后台在线编辑 | ✓ | ✓ | 需 KV | 需 redis | 需 redis |
+| 配置持久化 | file ✓ | file ✓ | KV / memory | env / redis | Blobs ✓ |
+| 后台在线编辑 | ✓ | ✓ | 需 KV | 需 redis | ✓ |
 | 多实例精确限流 | 单机 OK | 单机 OK | 不精确 | 不精确 | 不精确 |
-| 部署复杂度 | 低 | 低 | 中 | 中 | 中 |
+| 部署复杂度 | 低 | 低 | 中 | 中 | 低 |
 
 ## 配置说明
 
@@ -813,6 +818,7 @@ CONFIG_STORE_TYPE = "memory"
 | 内存 (Memory) | ✓ | ✓ | ✓ | ✓ |
 | 文件 (File, Node.js) | ✓ | ✓ | — | ✓ |
 | 环境变量 (Env, 只读) | ✓ | — | — | — |
+| Netlify Blobs | ✓ | — | — | ✓ |
 | Redis | 计划中 | 计划中 | 计划中 | — |
 
 通过环境变量或 `secret.json` 设置：
@@ -824,7 +830,7 @@ RATE_LIMIT_STORE_TYPE=memory
 DEVICE_STORE_TYPE=memory
 ```
 
-**注意**：内存在重启后丢失。单机 Node.js 用 file 持久化。Serverless 多实例用 Redis。
+**注意**：内存在重启后丢失。单机 Node.js 用 file 持久化。Netlify 原生使用 Blobs，无需外部服务。其他 Serverless 平台可用 Redis。
 
 ### 校验策略
 

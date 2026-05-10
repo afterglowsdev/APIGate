@@ -1,12 +1,15 @@
 /**
  * Netlify Functions Runtime Adapter / Netlify Functions 运行时适配
+ *
+ * Uses Netlify Blobs for persistent storage — no external Redis needed.
+ * 使用 Netlify Blobs 实现持久化存储，无需外部 Redis。
  */
 
 import { createApp } from '../src/app.js'
-import { EnvConfigStore } from '../src/stores/config/env.js'
+import { NetlifyBlobsConfigStore } from '../src/stores/config/netlify-blobs.js'
 import { MemoryUsageStore } from '../src/stores/usage/memory.js'
 import { MemoryRateLimitStore } from '../src/stores/rate-limit/memory.js'
-import { MemoryDeviceStore } from '../src/stores/device/memory.js'
+import { NetlifyBlobsDeviceStore } from '../src/stores/device/netlify-blobs.js'
 
 interface NetlifyEvent {
   rawUrl: string
@@ -19,10 +22,13 @@ export default async function handler(event: NetlifyEvent): Promise<{
   statusCode: number; headers: Record<string, string>; body: string
 }> {
   const app = createApp({
-    configStore: new EnvConfigStore(process.env.GATEWAY_CONFIG_JSON || ''),
+    // Netlify Blobs — persistent, no external service needed
+    configStore: new NetlifyBlobsConfigStore('gateway-config'),
+    // Usage and rate-limit still use memory in MVP (acceptable for single-function)
     usageStore: new MemoryUsageStore(),
     rateLimitStore: new MemoryRateLimitStore(),
-    deviceStore: new MemoryDeviceStore(),
+    // Device records persisted via Blobs
+    deviceStore: new NetlifyBlobsDeviceStore('gateway-devices'),
     newApiBaseUrl: process.env.NEW_API_BASE_URL || '',
     newApiToken: process.env.NEW_API_TOKEN || '',
     adminPassword: process.env.ADMIN_PASSWORD || 'admin',
