@@ -370,6 +370,29 @@ Deploy: `netlify deploy --prod`.
 
 ## Configuration
 
+### Server / 服务器
+
+**Port / 端口** — three levels of precedence, highest first / 三层优先级，从高到低：
+
+1. System environment variable / 系统环境变量: `PORT`
+2. `secret.json`: `"PORT": "3000"`
+3. Code default / 代码默认值: `3000`
+
+```powershell
+# Temporary / 临时
+$env:PORT=8080; pnpm start
+
+# Linux / macOS / Docker
+PORT=8080 pnpm start
+```
+
+In `secret.json`:
+```json
+{ "PORT": "8080" }
+```
+
+**Admin path prefix / 管理后台路径** — change in `src/routes/admin-spa.ts`, variable `ADMIN_PATH`. Default `/admin`, can be set to `/manage/` or any custom path.
+
 ### Storage Backends
 
 | Backend | Config Store | Usage Store | Rate Limit Store | Device Store |
@@ -810,6 +833,29 @@ CONFIG_STORE_TYPE = "memory"
 | 部署复杂度 | 低 | 低 | 中 | 中 | 低 |
 
 ## 配置说明
+
+### 服务器
+
+**端口** — 三层优先级，从高到低：
+
+1. 系统环境变量: `PORT`
+2. `secret.json`: `"PORT": "3000"`
+3. 代码默认值: `3000`
+
+```powershell
+# Windows 临时设置
+$env:PORT=8080; pnpm start
+
+# Linux / macOS / Docker
+PORT=8080 pnpm start
+```
+
+在 `secret.json` 中：
+```json
+{ "PORT": "8080" }
+```
+
+**管理后台路径** — 修改 `src/routes/admin-spa.ts` 中的 `ADMIN_PATH` 变量。默认 `/admin`，可改为 `/manage/` 或自定义路径。
 
 ### 存储后端
 

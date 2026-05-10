@@ -8,51 +8,56 @@ import { resolve } from 'node:path'
 /**
  * Admin SPA serving routes / 管理后台 SPA 路由
  *
- * Development: redirect to Vite dev server (localhost:5173)
- *              开发模式：重定向到 Vite dev server
- * Production (Node.js): serve static files from admin dist/
- *                       生产模式：提供管理后台静态文件
+ * Production: serves built static files from ../admin/dist
+ *             生产模式：提供已构建的静态文件
+ * Development: also serves static files if built, otherwise shows a hint
+ *              开发模式：如果已构建则提供静态文件，否则显示提示
+ *
+ * In dev mode, it's recommended to access the admin UI at http://localhost:5173
+ * (Vite dev server with hot-reload). The gateway's /admin always serves the
+ * production build — no redirects to Vite.
+ * 开发时建议直接访问 :5173（Vite 热更新），网关的 /admin 始终提供生产构建。
  *
  * Customize the admin path prefix by changing ADMIN_PATH below.
- * ADMIN_PATH 为管理后台路径前缀，可按需修改。
- * Default / 默认：/admin
+ * ADMIN_PATH 为管理后台路径前缀，可按需修改。默认 /admin。
  */
 const ADMIN_PATH = '/admin'
 
 export function registerAdminSpaRoutes(
   app: Hono<{ Variables: GatewayVariables; Bindings: GatewayBindings }>,
   logger: Logger,
-  isDev: boolean,
+  _isDev: boolean,
   adminDistPath?: string,
 ) {
-  if (isDev) {
-    // Dev mode: redirect to Vite. The Vite server handles everything.
-    // 开发模式：重定向到 Vite dev server
-    logger.info('Admin SPA: dev mode — redirecting to http://localhost:5173')
-    app.get(`${ADMIN_PATH}`, (c) => c.redirect('http://localhost:5173'))
-    app.get(`${ADMIN_PATH}/*`, (c) => c.redirect('http://localhost:5173'))
-    return
-  }
-
-  // Production: serve static files
-  // 生产模式：提供静态文件
   const distPath = adminDistPath || resolve(process.cwd(), '..', 'admin', 'dist')
 
   if (!existsSync(distPath)) {
-    logger.warn(`Admin SPA: dist not found at ${distPath} — admin UI unavailable. Run "pnpm build" first.`)
+    logger.warn(`Admin SPA: dist not found at ${distPath}`)
+    logger.warn('Run "pnpm build" to build the admin frontend, or use "pnpm dev:admin" for development at http://localhost:5173')
     app.get(`${ADMIN_PATH}`, (c) =>
-      c.html('<html><body><h1>Admin UI not built</h1><p>Run <code>pnpm build</code> first.</p></body></html>'))
+      c.html(`<html><body style="font-family:sans-serif;padding:2rem">
+        <h1>Admin UI not built</h1>
+        <p>The admin frontend has not been built yet.</p>
+        <p><b>Production:</b> <code>pnpm build</code></p>
+        <p><b>Development:</b> <code>pnpm dev:admin</code> then visit <a href="http://localhost:5173">http://localhost:5173</a></p>
+      </body></html>`))
     app.get(`${ADMIN_PATH}/*`, (c) =>
-      c.html('<html><body><h1>Admin UI not built</h1><p>Run <code>pnpm build</code> first.</p></body></html>'))
+      c.html(`<html><body style="font-family:sans-serif;padding:2rem">
+        <h1>Admin UI not built</h1>
+        <p>Run <code>pnpm build</code> first.</p>
+      </body></html>`))
     return
   }
 
-  logger.info(`Admin SPA: serving static files from ${distPath}`)
+  logger.info(`Admin SPA: serving from ${distPath}`)
 
-  // Serve static assets
-  app.use(`${ADMIN_PATH}/*`, serveStatic({ root: distPath }))
+  // Serve ALL static files from admin dist at root level.
+  // This handles /assets/*.js, /assets/*.css, /favicon.ico etc.
+  // API routes (/api/*, /v1/*, /health) have priority and won't be overridden.
+  // 提供 dist 下所有静态文件，API 路由优先。
+  app.use('/*', serveStatic({ root: distPath }))
 
-  // SPA fallback: any unmatched /admin/* returns index.html
+  // SPA fallback: /admin and /admin/* return index.html / SPA 回退
   app.get(`${ADMIN_PATH}`, serveStatic({ path: '/index.html', root: distPath }))
   app.get(`${ADMIN_PATH}/*`, serveStatic({ path: '/index.html', root: distPath }))
 }

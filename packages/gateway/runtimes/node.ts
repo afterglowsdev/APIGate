@@ -68,7 +68,8 @@ async function loadSecrets(): Promise<Record<string, string>> {
   // Env vars take precedence
   for (const key of ['NEW_API_BASE_URL', 'NEW_API_TOKEN', 'ADMIN_PASSWORD', 'ADMIN_JWT_SECRET',
     'CONFIG_STORE_TYPE', 'CONFIG_FILE_PATH', 'USAGE_STORE_TYPE', 'USAGE_FILE_PATH',
-    'RATE_LIMIT_STORE_TYPE', 'REDIS_URL', 'LOG_LEVEL', 'NODE_ENV', 'GATEWAY_CONFIG_JSON']) {
+    'RATE_LIMIT_STORE_TYPE', 'DEVICE_STORE_TYPE', 'DEVICE_FILE_PATH',
+    'REDIS_URL', 'LOG_LEVEL', 'NODE_ENV', 'PORT', 'GATEWAY_CONFIG_JSON']) {
     const envVal = process.env[key]
     if (envVal) {
       secrets[key] = envVal
@@ -171,7 +172,7 @@ async function main() {
     isDev,
   })
 
-  const port = parseInt(process.env.PORT || '3000', 10)
+  const port = parseInt(process.env.PORT || secrets.PORT || '3000', 10)
 
   console.log(`[gateway] Starting on http://localhost:${port}`)
   console.log(`[gateway] Admin GUI: http://localhost:${port}/admin`)
