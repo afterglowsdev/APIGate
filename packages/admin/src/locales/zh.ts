@@ -97,6 +97,10 @@ export default {
     systemPrompt: '系统提示词', userMessage: '用户消息', placeholder: '输入你的消息...',
     stream: '流式输出', send: '发送', running: '运行中...',
     response: '响应结果', empty: '发送消息以查看响应', error: '错误',
+    advancedMode: '高级模式', advancedModeDesc: '手动填入鉴权 Header，直接调用 /v1/chat/completions 端点',
+    appId: 'X-App-Id', deviceId: 'X-Device-Id', userId: 'user_id',
+    appVersion: 'X-App-Version', platform: 'X-Platform',
+    authHeaders: '鉴权 Header（按你的 App 配置填写）',
   },
 
   dialog: { cancel: '取消', confirm: '确认', delete: '删除' },

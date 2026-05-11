@@ -55,7 +55,14 @@ export function createAuthMiddleware(
     }
 
     // 2. Check app secret if required / 验证应用密钥
-    if (app.requireAppSecret && app.appSecret) {
+    if (app.requireAppSecret) {
+      if (!app.appSecret) {
+        logger.error('Auth blocked: app secret required but not configured', { appId })
+        throw new ForbiddenError(
+          'app_secret_not_configured',
+          `Application "${appId}" requires an app secret but none is configured`,
+        )
+      }
       const secret = c.req.header('X-App-Secret')
         || c.req.header('Authorization')?.match(/^Bearer\s+(.+)$/i)?.[1]
       if (!secret || !secureCompare(secret, app.appSecret)) {

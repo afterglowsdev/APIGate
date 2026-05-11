@@ -48,5 +48,5 @@ export function registerProxyRoute(
 
   // Chain: requestLogger → auth → quota → rate-limit → model-select → proxy
   // 中间件链：日志 → 鉴权 → 额度 → 限流 → 模型选择 → 代理
-  app.post('/v1/chat/completions', requestLogger, auth, quota, rateLimit, modelSelect, (c) => proxyHandler(c))
+  app.post('/v1/chat/completions', requestLogger, auth, modelSelect, quota, rateLimit, (c) => proxyHandler(c))
 }

@@ -1,4 +1,10 @@
 const BASE = '/api/admin'
+const encodePathSegment = (value: string) => encodeURIComponent(value)
+let unauthorizedHandler: null | (() => void | Promise<void>) = null
+
+export function setUnauthorizedHandler(handler: () => void | Promise<void>) {
+  unauthorizedHandler = handler
+}
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const resp = await fetch(`${BASE}${path}`, {
@@ -8,8 +14,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   })
 
   if (resp.status === 401) {
-    const { useAuthStore } = await import('../stores/auth')
-    useAuthStore().logout()
+    await unauthorizedHandler?.()
     throw new Error('Unauthorized')
   }
 
@@ -119,10 +124,29 @@ export const api = {
     if (params?.limit != null) q.set('limit', String(params.limit))
     return request<DeviceListResult>(`/devices?${q.toString()}`)
   },
-  blockDevice(appId: string, deviceId: string) { return request<{ ok: boolean }>(`/devices/${appId}/${deviceId}/block`, { method: 'POST' }) },
-  unblockDevice(appId: string, deviceId: string) { return request<{ ok: boolean }>(`/devices/${appId}/${deviceId}/unblock`, { method: 'POST' }) },
-  updateDeviceNote(appId: string, deviceId: string, note: string) { return request<{ ok: boolean }>(`/devices/${appId}/${deviceId}/note`, { method: 'PUT', body: JSON.stringify({ note }) }) },
+  blockDevice(appId: string, deviceId: string) {
+    return request<{ ok: boolean }>(`/devices/${encodePathSegment(appId)}/${encodePathSegment(deviceId)}/block`, { method: 'POST' })
+  },
+  unblockDevice(appId: string, deviceId: string) {
+    return request<{ ok: boolean }>(`/devices/${encodePathSegment(appId)}/${encodePathSegment(deviceId)}/unblock`, { method: 'POST' })
+  },
+  updateDeviceNote(appId: string, deviceId: string, note: string) {
+    return request<{ ok: boolean }>(`/devices/${encodePathSegment(appId)}/${encodePathSegment(deviceId)}/note`, {
+      method: 'PUT',
+      body: JSON.stringify({ note }),
+    })
+  },
 
   // Upstream models / 上游模型列表
   getUpstreamModels() { return request<{ ok: boolean; models?: string[]; error?: string }>('/upstream-models') },
+
+  // Test chat / 测试聊天（走 admin test 端点，无需客户端鉴权）
+  test(body: { profile: string; messages: { role: string; content: string }[]; stream: boolean }) {
+    return fetch(`${BASE}/test`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  },
 }

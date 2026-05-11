@@ -97,6 +97,10 @@ export default {
     systemPrompt: 'System Prompt', userMessage: 'User Message', placeholder: 'Type your message...',
     stream: 'Stream', send: 'Send', running: 'Running...',
     response: 'Response', empty: 'Send a message to see the response', error: 'Error',
+    advancedMode: 'Advanced Mode', advancedModeDesc: 'Manually fill auth headers to call /v1/chat/completions directly',
+    appId: 'X-App-Id', deviceId: 'X-Device-Id', userId: 'user_id',
+    appVersion: 'X-App-Version', platform: 'X-Platform',
+    authHeaders: 'Auth Headers (fill per your App config)',
   },
 
   dialog: { cancel: 'Cancel', confirm: 'Confirm', delete: 'Delete' },

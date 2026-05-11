@@ -1,10 +1,12 @@
-import type { Hono } from 'hono'
+import type { Hono, MiddlewareHandler } from 'hono'
 import type { GatewayVariables, GatewayBindings } from '../types/env.js'
 import type { IConfigStore } from '../interfaces/config-store.js'
 import type { IDeviceStore } from '../interfaces/device-store.js'
 import type { Logger } from '../services/logger.js'
 import { createAdminAuthMiddleware, createLoginHandler, createLogoutHandler } from '../services/admin-auth.js'
 import { createProxyHandler } from '../services/proxy.js'
+import { createModelSelectMiddleware } from '../services/model-router.js'
+import { generateRequestId } from '../utils/id.js'
 
 /**
  * Lenient validation for config save — only structural checks, allows incomplete drafts.
@@ -64,6 +66,31 @@ export function registerAdminRoutes(
   const adminAuth = createAdminAuthMiddleware(jwtSecret, logger)
   const loginHandler = createLoginHandler(adminPassword, jwtSecret, logger)
   const logoutHandler = createLogoutHandler()
+  const modelSelect = createModelSelectMiddleware(configStore, logger)
+  const proxyHandler = createProxyHandler(configStore, logger, newApiToken, newApiBaseUrl)
+
+  // Injects a fake app + requestId for admin test endpoint
+  const injectTestApp: MiddlewareHandler = async (c, next) => {
+    c.set('requestId', generateRequestId())
+    c.set('app', {
+      appId: 'admin-test',
+      name: 'Admin Test',
+      enabled: true,
+      requireAppSecret: false,
+      appSecret: '',
+      identifiers: [],
+      autoRegisterDevices: false,
+      allowAnonymousDevices: true,
+      defaultProfile: '',
+      allowedProfiles: [],
+      perDeviceDailyQuota: 0,
+      perDeviceMonthlyQuota: 0,
+      perDeviceRateLimitPerMinute: 0,
+      perIpRateLimitPerMinute: 0,
+      globalRateLimitPerMinute: 0,
+    })
+    await next()
+  }
 
   // ---- Public / 公开 ----
   app.post('/api/admin/login', (c) => loginHandler(c))
@@ -121,8 +148,10 @@ export function registerAdminRoutes(
 
     // Preserve masked app secrets / 保留被遮盖的密钥
     if (body.apps && Array.isArray(body.apps)) {
+      const existingAppsById = new Map(existing.apps.map((app) => [app.appId, app]))
       merged.apps = (body.apps as Record<string, unknown>[]).map((newApp, i) => {
-        const existingApp = existing.apps[i]
+        const nextAppId = typeof newApp.appId === 'string' ? newApp.appId : ''
+        const existingApp = existingAppsById.get(nextAppId) || existing.apps[i]
         const secret = newApp.appSecret as string
         if (existingApp && secret === '****') {
           return { ...existingApp, ...newApp, appSecret: existingApp.appSecret }
@@ -205,26 +234,7 @@ export function registerAdminRoutes(
   })
 
   // ---- Test endpoint / 测试端点 ----
-  app.post('/api/admin/test', adminAuth, async (c) => {
-    const proxyHandler = createProxyHandler(configStore, logger, newApiToken, newApiBaseUrl)
-    // Inject a fake app for test requests / 为测试请求注入虚拟应用
-    c.set('app', {
-      appId: 'admin-test',
-      name: 'Admin Test',
-      enabled: true,
-      requireAppSecret: false,
-      appSecret: '',
-      identifiers: [],
-      autoRegisterDevices: false,
-      allowAnonymousDevices: true,
-      defaultProfile: '',
-      allowedProfiles: [],
-      perDeviceDailyQuota: 0,
-      perDeviceMonthlyQuota: 0,
-      perDeviceRateLimitPerMinute: 0,
-      perIpRateLimitPerMinute: 0,
-      globalRateLimitPerMinute: 0,
-    })
-    return proxyHandler(c)
-  })
+  // Uses adminAuth (JWT) instead of client auth headers. Fake app is injected,
+  // then model-router resolves profile → real model, then proxy forwards.
+  app.post('/api/admin/test', adminAuth, injectTestApp, modelSelect, (c) => proxyHandler(c))
 }

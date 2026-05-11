@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { setUnauthorizedHandler } from './api/client'
 import { useAuthStore } from './stores/auth'
 
 const auth = useAuthStore()
+setUnauthorizedHandler(() => auth.handleUnauthorized())
 </script>
 
 <template>

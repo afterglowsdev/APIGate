@@ -17,8 +17,15 @@
 import type { MiddlewareHandler } from 'hono'
 import type { IConfigStore } from '../interfaces/config-store.js'
 import { weightedRandomSelect } from '../utils/weighted-random.js'
+import { parseRequestBody } from '../utils/request.js'
 import type { Logger } from './logger.js'
-import { ProfileNotFoundError, ProfileDisabledError, ModelNotAllowedError, InternalError } from '../types/errors.js'
+import {
+  ProfileNotFoundError,
+  ProfileDisabledError,
+  ModelNotAllowedError,
+  InternalError,
+  InvalidRequestError,
+} from '../types/errors.js'
 import type { WeightedModel } from '../types/config.js'
 
 export function createModelSelectMiddleware(configStore: IConfigStore, logger: Logger): MiddlewareHandler {
@@ -26,15 +33,12 @@ export function createModelSelectMiddleware(configStore: IConfigStore, logger: L
     const app = c.get('app')
     if (!app) { await next(); return }
 
-    let body: Record<string, unknown>
-    try {
-      body = await c.req.json()
-    } catch {
-      await next()
-      return
-    }
-
     const config = await configStore.getConfig()
+    const parsedBody = await parseRequestBody(c.req.raw.clone(), config.requestBodyLimitBytes || 1024 * 1024)
+    if (!parsedBody || typeof parsedBody !== 'object' || Array.isArray(parsedBody)) {
+      throw new InvalidRequestError('Request body must be a JSON object')
+    }
+    const body = parsedBody as Record<string, unknown>
 
     // 1. Determine profile: explicit profile/model > app.defaultProfile > global defaultProfile
     //    确定档位：请求指定 > 应用默认 > 全局默认

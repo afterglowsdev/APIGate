@@ -1,3 +1,5 @@
+import { InvalidRequestError, RequestTooLargeError } from '../types/errors.js'
+
 const IP_HEADERS = ['CF-Connecting-IP', 'X-Forwarded-For', 'X-Real-IP']
 
 export function getClientIP(headers: Headers): string {
@@ -15,18 +17,18 @@ export function getClientIP(headers: Headers): string {
 export async function parseRequestBody(req: Request, limitBytes: number): Promise<unknown> {
   const contentLength = parseInt(req.headers.get('content-length') || '0', 10)
   if (contentLength > limitBytes) {
-    throw { code: 'request_too_large', message: 'Request body too large', status: 413 }
+    throw new RequestTooLargeError()
   }
 
   const text = await req.text()
-  if (text.length > limitBytes) {
-    throw { code: 'request_too_large', message: 'Request body too large', status: 413 }
+  if (new TextEncoder().encode(text).byteLength > limitBytes) {
+    throw new RequestTooLargeError()
   }
 
   try {
     return JSON.parse(text)
   } catch {
-    throw { code: 'invalid_request', message: 'Invalid JSON in request body', status: 400 }
+    throw new InvalidRequestError('Invalid JSON in request body')
   }
 }
 

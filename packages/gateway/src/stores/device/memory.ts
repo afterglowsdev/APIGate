@@ -49,11 +49,11 @@ export class MemoryDeviceStore implements IDeviceStore {
     }
 
     const total = devices.length
-    const offset = query.offset || 0
-    const limit = query.limit || 50
+    const offset = query.offset ?? 0
+    const limit = query.limit ?? 50
 
     return {
-      devices: devices.slice(offset, offset + limit),
+      devices: limit <= 0 ? [] : devices.slice(offset, offset + limit),
       total,
     }
   }

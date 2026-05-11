@@ -8,6 +8,11 @@ export const useAuthStore = defineStore('auth', () => {
   const isLoading = ref(false)
   const error = ref('')
 
+  function handleUnauthorized() {
+    isAuthenticated.value = false
+    router.push('/login')
+  }
+
   async function login(password: string): Promise<boolean> {
     isLoading.value = true
     error.value = ''
@@ -26,8 +31,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function logout() {
     try { await api.logout() } catch { /* ignore */ }
-    isAuthenticated.value = false
-    router.push('/login')
+    handleUnauthorized()
   }
 
   async function checkSession() {
@@ -39,5 +43,5 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { isAuthenticated, isLoading, error, login, logout, checkSession }
+  return { isAuthenticated, isLoading, error, login, logout, checkSession, handleUnauthorized }
 })

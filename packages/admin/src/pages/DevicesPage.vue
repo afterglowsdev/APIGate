@@ -144,7 +144,7 @@ function page(rel: number) {
             </td>
             <td class="px-3 py-2 text-gray-500">{{ d.appVersion || '-' }}</td>
             <td class="px-3 py-2 text-gray-500">{{ d.platform || '-' }}</td>
-            <td class="px-3 py-2 text-gray-500">{{ formatDate(d.lastSeen) }}</td>
+            <td class="px-3 py-2 text-gray-500">{{ formatDate(d.lastSeenAt) }}</td>
             <td class="px-3 py-2 text-gray-500 max-w-[120px] truncate">{{ d.note || '-' }}</td>
             <td class="px-3 py-2">
               <div class="flex items-center gap-1">

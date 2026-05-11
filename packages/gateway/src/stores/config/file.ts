@@ -5,7 +5,8 @@ import { DEFAULT_GATEWAY_CONFIG } from '../../types/config.js'
 import type { IConfigStore } from '../../interfaces/config-store.js'
 
 /** Migrate old "clients" field to new "apps" field / 将旧 clients 字段迁移为新 apps 字段 */
-function migrateConfig(raw: Record<string, unknown>): Record<string, unknown> {
+function migrateConfig(raw: Record<string, unknown>): { config: Record<string, unknown>; migrated: boolean } {
+  let migrated = false
   if (Array.isArray(raw.clients) && !Array.isArray(raw.apps)) {
     console.log('[gateway] Migrating old "clients" config to new "apps" format')
     raw.apps = (raw.clients as Record<string, unknown>[]).map((c: Record<string, unknown>) => ({
@@ -29,8 +30,9 @@ function migrateConfig(raw: Record<string, unknown>): Record<string, unknown> {
       globalRateLimitPerMinute: 0,
     }))
     delete raw.clients
+    migrated = true
   }
-  return raw
+  return { config: raw, migrated }
 }
 
 export class FileConfigStore implements IConfigStore {
@@ -46,10 +48,10 @@ export class FileConfigStore implements IConfigStore {
       const parsed = JSON.parse(raw) as Record<string, unknown>
       const migrated = migrateConfig(parsed)
       // Save migrated config back / 回写迁移后的配置
-      if (migrated !== parsed) {
-        await this.saveConfig(migrated as unknown as GatewayConfig)
+      if (migrated.migrated) {
+        await this.saveConfig(migrated.config as unknown as GatewayConfig)
       }
-      return migrated as unknown as GatewayConfig
+      return migrated.config as unknown as GatewayConfig
     } catch {
       const defaults = structuredClone(DEFAULT_GATEWAY_CONFIG)
       await this.saveConfig(defaults)
