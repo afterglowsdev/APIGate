@@ -57,6 +57,9 @@ importers:
 
   packages/gateway:
     dependencies:
+      '@netlify/blobs':
+        specifier: ^10.7.5
+        version: 10.7.5
       hono:
         specifier: ^4.7.0
         version: 4.12.18
