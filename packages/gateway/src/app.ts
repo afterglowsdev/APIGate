@@ -26,10 +26,17 @@ import type { Logger, LogLevel, LogFormat } from './services/logger.js'
 import { registerHealthRoute } from './routes/health.js'
 import { registerProxyRoute } from './routes/proxy.js'
 import { registerAdminRoutes } from './routes/admin.js'
-import { registerAdminSpaRoutes } from './routes/admin-spa.js'
 import { errorToResponse } from './utils/errors.js'
 import { GatewayError } from './types/errors.js'
 import { nowMs } from './utils/time.js'
+
+type GatewayApp = Hono<{ Variables: GatewayVariables; Bindings: GatewayBindings }>
+
+export type RegisterAdminSpaRoutes = (
+  app: GatewayApp,
+  logger: Logger,
+  isDev: boolean,
+) => void
 
 export interface GatewayOptions {
   configStore: IConfigStore
@@ -43,9 +50,10 @@ export interface GatewayOptions {
   logLevel?: LogLevel
   logFormat?: LogFormat
   isDev?: boolean
+  registerAdminSpaRoutes?: RegisterAdminSpaRoutes
 }
 
-export function createApp(options: GatewayOptions): Hono<{ Variables: GatewayVariables; Bindings: GatewayBindings }> {
+export function createApp(options: GatewayOptions): GatewayApp {
   const {
     configStore,
     usageStore,
@@ -58,6 +66,7 @@ export function createApp(options: GatewayOptions): Hono<{ Variables: GatewayVar
     logLevel = 'info',
     logFormat = 'pretty',
     isDev = false,
+    registerAdminSpaRoutes,
   } = options
 
   const logger = createLogger(logLevel, logFormat)
@@ -112,7 +121,9 @@ export function createApp(options: GatewayOptions): Hono<{ Variables: GatewayVar
   registerHealthRoute(app)
   registerProxyRoute(app, configStore, usageStore, rateLimitStore, deviceStore, logger, newApiToken, newApiBaseUrl)
   registerAdminRoutes(app, configStore, deviceStore, logger, adminPassword, adminJwtSecret, newApiToken, newApiBaseUrl)
-  registerAdminSpaRoutes(app, logger, isDev)
+  if (registerAdminSpaRoutes) {
+    registerAdminSpaRoutes(app, logger, isDev)
+  }
 
   // Fallback 404
   app.all('*', (c) => {

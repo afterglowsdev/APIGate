@@ -13,6 +13,7 @@
 
 import { serve } from '@hono/node-server'
 import { createApp } from '../src/app.js'
+import { registerAdminSpaRoutes } from '../src/routes/admin-spa.js'
 import { MemoryConfigStore } from '../src/stores/config/memory.js'
 import { FileConfigStore } from '../src/stores/config/file.js'
 import { EnvConfigStore } from '../src/stores/config/env.js'
@@ -170,6 +171,7 @@ async function main() {
     logLevel,
     logFormat,
     isDev,
+    registerAdminSpaRoutes,
   })
 
   const port = parseInt(process.env.PORT || secrets.PORT || '3000', 10)
