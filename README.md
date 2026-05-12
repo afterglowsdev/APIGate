@@ -1,4 +1,4 @@
-# LLM API Gateway
+﻿# LLM API Gateway
 
 [English](#english) | [中文](#chinese)
 
@@ -444,6 +444,8 @@ How it works on Netlify:
 1. System environment variable / 系统环境变量: `PORT`
 2. `secret.json`: `"PORT": "3000"`
 3. Code default / 代码默认值: `3000`
+
+For serverless platforms such as Cloudflare Workers, Netlify Functions, and Vercel Functions, you normally do not need to configure `PORT`. The platform provides the HTTP entrypoint for you. `PORT` is only relevant for local Node.js, Docker, and self-hosted server processes.
 
 ```powershell
 # Temporary / 临时
@@ -968,6 +970,8 @@ CONFIG_STORE_TYPE = "memory"
 1. 系统环境变量: `PORT`
 2. `secret.json`: `"PORT": "3000"`
 3. 代码默认值: `3000`
+
+补充说明：Cloudflare Workers、Netlify Functions、Vercel Functions 这类 Serverless 平台通常不需要你自己配置 `PORT`。HTTP 入口由平台托管，`PORT` 只对本地 Node.js、Docker、自建服务器这类自己监听端口的部署方式有意义。
 
 ```powershell
 # Windows 临时设置

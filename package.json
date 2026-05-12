@@ -10,6 +10,14 @@
     "typecheck": "pnpm --filter @afterglowsdev/gateway typecheck"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild", "vue-demi"]
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "vue-demi"
+    ]
+  },
+  "dependencies": {
+    "@netlify/blobs": "^10.7.5",
+    "hono": "^4.12.18",
+    "jose": "^5.10.0"
   }
 }

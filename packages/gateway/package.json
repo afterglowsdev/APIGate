@@ -9,6 +9,7 @@
     "start": "tsx runtimes/node.ts"
   },
   "dependencies": {
+    "@netlify/blobs": "^10.7.5",
     "hono": "^4.7.0",
     "jose": "^5.9.0"
   },
