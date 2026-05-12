@@ -6,6 +6,15 @@
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
+[template]
+
+[template.environment]
+  NEW_API_BASE_URL = "https://your-newapi.example.com"
+  NEW_API_TOKEN = "Set your upstream token"
+  ADMIN_PASSWORD = "Set an admin password"
+  ADMIN_JWT_SECRET = "Set a long random JWT secret"
+  LOG_LEVEL = "info"
+
 [[redirects]]
   from = "/v1/chat/completions"
   to = "/.netlify/functions/gateway"

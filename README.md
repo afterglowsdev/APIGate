@@ -258,6 +258,18 @@ curl -N https://your-gateway.example.com/v1/chat/completions \
 
 ## Deployment
 
+### One-Click Deploy
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/afterglowsdev/APIGate)
+[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/afterglowsdev/APIGate&fullConfiguration=true)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fafterglowsdev%2FAPIGate)
+
+Notes:
+
+- Cloudflare's official deploy button has monorepo limitations. For this repository, the manual Workers Build settings documented below are still the most reliable path.
+- Netlify is currently the most complete one-click target for this repo because it can publish the admin panel and wire the gateway function in a single flow.
+- Vercel can import from the button, but this project still depends on the checked-in root `vercel.json` and `api/gateway.ts` layout.
+
 ### 1. Node.js (Windows / Linux / Self-hosted)
 
 Copy `.env.example` to `.env` and fill in your values:
@@ -306,7 +318,15 @@ All configuration via environment variables. For Zeabur, set the same variables 
 
 ### 3. Cloudflare Workers
 
-Copy `wrangler.toml.example` to `wrangler.toml`. Set secrets via Wrangler CLI:
+The repository root now includes `wrangler.toml`, so deploy from the repo root. Do not prepend `cd packages/gateway &&` in Cloudflare's build UI.
+
+Recommended project settings:
+
+- Root directory: repo root
+- Build command: `pnpm build`
+- Deploy command: `npx wrangler deploy`
+
+Set secrets via Wrangler CLI or the Cloudflare dashboard:
 
 ```bash
 wrangler secret put NEW_API_TOKEN
@@ -314,22 +334,35 @@ wrangler secret put ADMIN_PASSWORD
 wrangler secret put ADMIN_JWT_SECRET
 ```
 
-In `wrangler.toml`:
+Default `wrangler.toml`:
 
 ```toml
+name = "llm-api-gateway"
+main = "packages/gateway/runtimes/cloudflare-worker.ts"
+compatibility_date = "2026-05-12"
+
 [vars]
 NEW_API_BASE_URL = "https://your-newapi.example.com"
 LOG_LEVEL = "info"
-CONFIG_STORE_TYPE = "memory"
 ```
 
-Deploy: `wrangler deploy`. Deploy the admin UI separately to Cloudflare Pages.
+Deploy:
 
-**Storage**: Workers are stateless. Config uses `memory` (lost on restart, re-configure via Admin GUI) or bind a KV namespace for persistence (`cloudflare-kv`).
+```bash
+pnpm build
+npx wrangler deploy
+```
+
+Admin UI for Workers should be deployed separately as a static site, for example with Cloudflare Pages:
+
+- Build command: `pnpm --filter @afterglowsdev/admin build`
+- Build output directory: `packages/admin/dist`
+
+**Storage**: the current Workers runtime uses in-memory stores. Config, usage, rate-limit counters, and devices are reset after cold starts or redeploys. If you need persistent config/device storage on Cloudflare, add a KV or D1 backed store implementation.
 
 ### 4. Vercel
 
-`vercel.json` included. Set Environment Variables in Vercel project settings:
+The repository root now includes `vercel.json` and `api/gateway.ts`, so Vercel can deploy directly from the monorepo root. Set Environment Variables in Vercel project settings:
 
 | Variable | Notes |
 |----------|-------|
@@ -340,11 +373,32 @@ Deploy: `wrangler deploy`. Deploy the admin UI separately to Cloudflare Pages.
 | `GATEWAY_CONFIG_JSON` | JSON config when `CONFIG_STORE_TYPE=env` (read-only) |
 | `CONFIG_STORE_TYPE` | `env` (read-only) or `memory` (editable but lost on cold start) |
 
-Deploy: `vercel deploy`. Deploy admin separately as a static site.
+Recommended project settings:
+
+- Root directory: repo root
+- Build command: `pnpm build`
+- Output directory: `packages/admin/dist`
+
+Deploy:
+
+```bash
+vercel deploy
+```
+
+The admin UI is served from the static output, and `/api/admin/*`, `/health`, `/v1/chat/completions` are rewritten to `api/gateway.ts`.
 
 ### 5. Netlify
 
-`netlify.toml` included. Set Environment Variables in Site settings:
+The repository root now includes `netlify.toml` and `netlify/functions/gateway.ts`. Deploy from the repo root and do not override the publish directory with `dist`.
+
+Recommended site settings:
+
+- Base directory: leave empty
+- Build command: `pnpm build`
+- Publish directory: `packages/admin/dist`
+- Functions directory: `netlify/functions`
+
+Set Environment Variables in Site settings:
 
 | Variable | Notes |
 |----------|-------|
@@ -352,10 +406,23 @@ Deploy: `vercel deploy`. Deploy admin separately as a static site.
 | `NEW_API_TOKEN` | New API upstream token |
 | `ADMIN_PASSWORD` | Admin password |
 | `ADMIN_JWT_SECRET` | JWT signing secret |
-| `GATEWAY_CONFIG_JSON` | JSON config when `CONFIG_STORE_TYPE=env` (read-only) |
-| `CONFIG_STORE_TYPE` | `netlify-blobs` (default, persistent) or `memory` |
+| `LOG_LEVEL` | Optional, default `info` |
 
-Deploy: `netlify deploy --prod`.
+Deploy:
+
+```bash
+pnpm build
+netlify deploy --prod
+```
+
+Or connect the Git repository and let Netlify use the checked-in `netlify.toml`.
+
+How it works on Netlify:
+
+- Static admin panel is published from `packages/admin/dist`
+- `/api/admin/*`, `/health`, `/v1/chat/completions` are redirected to `/.netlify/functions/gateway`
+- Gateway config and device records use Netlify Blobs
+- Usage and rate-limit counters still use `memory`
 
 **Storage**: Netlify Blobs provides native persistent storage — no external Redis needed. Config and device data survive cold starts. Usage and rate-limit counters still use `memory` (acceptable for single-function deployments).
 
@@ -474,7 +541,67 @@ MIT
 
 ---
 
+## 平台部署速查
+
+下面这几条以仓库根目录下的配置文件为准：
+
+- `netlify.toml`
+- `vercel.json`
+- `wrangler.toml`
+
+### Cloudflare Workers
+
+- 从仓库根目录部署，不要再写 `cd packages/gateway && ...`
+- Build command：`pnpm build`
+- Deploy command：`npx wrangler deploy`
+- Worker 入口：`packages/gateway/runtimes/cloudflare-worker.ts`
+- Secret：`NEW_API_TOKEN`、`ADMIN_PASSWORD`、`ADMIN_JWT_SECRET`
+- 普通变量：`NEW_API_BASE_URL`、`LOG_LEVEL`
+
+说明：当前 Workers 运行时还是内存存储，冷启动或重新部署后，配置、设备、额度和限流计数都会重置。管理后台建议单独部署到 Cloudflare Pages，构建命令用 `pnpm --filter @afterglowsdev/admin build`，输出目录填 `packages/admin/dist`。
+
+### Netlify
+
+- Base directory：留空
+- Build command：`pnpm build`
+- Publish directory：`packages/admin/dist`
+- Functions directory：`netlify/functions`
+- Netlify Function 入口：`netlify/functions/gateway.ts`
+
+需要配置的环境变量：
+
+- `NEW_API_BASE_URL`
+- `NEW_API_TOKEN`
+- `ADMIN_PASSWORD`
+- `ADMIN_JWT_SECRET`
+- `LOG_LEVEL`（可选）
+
+说明：Netlify 会把 `packages/admin/dist` 当静态站点发布，再把 `/api/admin/*`、`/health`、`/v1/chat/completions` 转发到 `/.netlify/functions/gateway`。配置和设备信息走 Netlify Blobs，能持久化；用量和限流计数还是内存级别，只能算近似值。
+
+### Vercel
+
+- Root directory：留空
+- Build command：`pnpm build`
+- Output directory：`packages/admin/dist`
+- Function 入口：`api/gateway.ts`
+
+如果需要把整个项目部署到 Vercel，仓库根目录现在也已经补了 `vercel.json`，不用再额外手搓路由重写。
+
+---
+
 <h1 id="chinese">中文</h1>
+
+## 一键部署
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/afterglowsdev/APIGate)
+[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/afterglowsdev/APIGate&fullConfiguration=true)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fafterglowsdev%2FAPIGate)
+
+说明：
+
+- Cloudflare 的官方按钮对 monorepo 支持一般，这个仓库更建议按下面的手动参数部署。
+- Netlify 目前是一键部署体验最完整的平台，同一个流程里就能把管理后台和网关函数接起来。
+- Vercel 按钮可以直接导入仓库，但仍然依赖仓库根目录下的 `vercel.json` 和 `api/gateway.ts`。
 
 ## 整体架构
 

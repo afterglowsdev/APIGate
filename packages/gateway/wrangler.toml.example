@@ -2,7 +2,7 @@
 # Copy to wrangler.toml and fill in your values
 
 name = "llm-api-gateway"
-main = "src/runtimes/cloudflare-worker.ts"
+main = "runtimes/cloudflare-worker.ts"
 compatibility_date = "2025-01-01"
 
 [vars]

@@ -1,0 +1,12 @@
+name = "llm-api-gateway"
+main = "packages/gateway/runtimes/cloudflare-worker.ts"
+compatibility_date = "2026-05-12"
+
+[vars]
+NEW_API_BASE_URL = "https://your-newapi.example.com"
+LOG_LEVEL = "info"
+
+# Secrets: set in the Cloudflare dashboard or with `wrangler secret put`
+# NEW_API_TOKEN
+# ADMIN_PASSWORD
+# ADMIN_JWT_SECRET

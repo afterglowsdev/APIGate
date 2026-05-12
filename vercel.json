@@ -1,0 +1,23 @@
+{
+  "functions": {
+    "api/**/*.ts": {
+      "runtime": "@vercel/node@3",
+      "memory": 512,
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/v1/chat/completions",
+      "destination": "/api/gateway"
+    },
+    {
+      "source": "/health",
+      "destination": "/api/gateway"
+    },
+    {
+      "source": "/api/admin/:path*",
+      "destination": "/api/gateway"
+    }
+  ]
+}
