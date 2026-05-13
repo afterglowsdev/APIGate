@@ -49,16 +49,18 @@ function cancelEdit() { editingApp.value = null }
 
 async function saveApp(appId: string) {
   store.updateApp(appId, form.value)
-  await store.saveConfig()
-  editingApp.value = null
+  const ok = await store.saveConfig()
+  if (ok) editingApp.value = null
 }
 
 async function createApp() {
   if (!newApp.value.appId) return
   store.addApp({ ...newApp.value })
-  await store.saveConfig()
-  showNewForm.value = false
-  newApp.value = defaultApp()
+  const ok = await store.saveConfig()
+  if (ok) {
+    showNewForm.value = false
+    newApp.value = defaultApp()
+  }
 }
 
 async function confirmDelete() {
@@ -117,6 +119,18 @@ const identTypes = [
   { value: 'user', label: '用户 user' },
   { value: 'custom', label: '自定义 custom' },
 ]
+
+function summarizeIdentifier(ident: AuthIdentifier): string {
+  const flags = [ident.required ? '必填' : '可选']
+  if (ident.track) flags.push('跟踪')
+  return `${ident.header}(${flags.join('/')})`
+}
+
+function summarizeIdentifiers(identifiers?: AuthIdentifier[]): string {
+  const active = (identifiers || []).filter((ident) => ident.header.trim().length > 0)
+  if (active.length === 0) return '未配置'
+  return active.map(summarizeIdentifier).join(', ')
+}
 </script>
 
 <template>
@@ -276,7 +290,7 @@ const identTypes = [
         <div v-else class="px-4 py-2.5 text-sm text-gray-500 flex items-center gap-4 flex-wrap">
           <span v-if="app.requireAppSecret">{{ t.apps.requireAppSecret }}: ON</span>
           <span>{{ t.apps.allowedProfiles }}: {{ app.allowedProfiles.join(', ') || 'none' }}</span>
-          <span class="text-gray-400">| 识别码: {{ app.identifiers?.map(i => i.header).join(', ') || '未配置' }}</span>
+          <span class="text-gray-400">| 识别码: {{ summarizeIdentifiers(app.identifiers) }}</span>
           <span v-if="app.perDeviceDailyQuota">日: {{ app.perDeviceDailyQuota }}</span>
           <span v-if="app.perDeviceRateLimitPerMinute">{{ app.perDeviceRateLimitPerMinute }}/min</span>
         </div>
