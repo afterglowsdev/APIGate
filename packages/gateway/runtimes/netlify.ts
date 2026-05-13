@@ -1,8 +1,9 @@
 /**
- * Netlify Functions Runtime Adapter / Netlify Functions 运行时适配
+ * Netlify Functions Runtime Adapter
  *
- * Uses Netlify Blobs for persistent storage — no external Redis needed.
- * 使用 Netlify Blobs 实现持久化存储，无需外部 Redis。
+ * Supports both:
+ * 1. Modern Netlify Functions, which pass a standard Request object
+ * 2. Legacy Lambda-style event objects
  */
 
 import { createApp } from '../src/app.js'
@@ -12,22 +13,20 @@ import { MemoryRateLimitStore } from '../src/stores/rate-limit/memory.js'
 import { NetlifyBlobsDeviceStore } from '../src/stores/device/netlify-blobs.js'
 
 interface NetlifyEvent {
-  rawUrl: string
+  rawUrl?: string
+  url?: string
+  path?: string
   httpMethod: string
   headers: Record<string, string>
   body?: string
+  isBase64Encoded?: boolean
 }
 
-export default async function handler(event: NetlifyEvent): Promise<{
-  statusCode: number; headers: Record<string, string>; body: string
-}> {
-  const app = createApp({
-    // Netlify Blobs — persistent, no external service needed
+function createGatewayApp() {
+  return createApp({
     configStore: new NetlifyBlobsConfigStore('gateway-config'),
-    // Usage and rate-limit still use memory in MVP (acceptable for single-function)
     usageStore: new MemoryUsageStore(),
     rateLimitStore: new MemoryRateLimitStore(),
-    // Device records persisted via Blobs
     deviceStore: new NetlifyBlobsDeviceStore('gateway-devices'),
     newApiBaseUrl: process.env.NEW_API_BASE_URL || '',
     newApiToken: process.env.NEW_API_TOKEN || '',
@@ -37,17 +36,52 @@ export default async function handler(event: NetlifyEvent): Promise<{
     logFormat: 'json',
     isDev: false,
   })
+}
 
-  const req = new Request(event.rawUrl, {
+function toRequest(event: NetlifyEvent): Request {
+  const headers = new Headers(event.headers || {})
+  const host = headers.get('host')
+  const proto = headers.get('x-forwarded-proto') || 'https'
+  const url = event.rawUrl || event.url || (host && event.path ? `${proto}://${host}${event.path}` : '')
+
+  if (!url) {
+    throw new TypeError('Netlify event did not include a usable request URL')
+  }
+
+  const body = event.body
+    ? (event.isBase64Encoded ? Buffer.from(event.body, 'base64') : event.body)
+    : undefined
+
+  return new Request(url, {
     method: event.httpMethod,
-    headers: new Headers(event.headers),
-    body: event.body || undefined,
+    headers,
+    body,
   })
+}
 
-  const resp = await app.fetch(req)
-  const respBody = await resp.text()
+async function toLambdaResponse(resp: Response): Promise<{
+  statusCode: number
+  headers: Record<string, string>
+  body: string
+}> {
+  const body = await resp.text()
   const headers: Record<string, string> = {}
-  resp.headers.forEach((v, k) => { headers[k] = v })
+  resp.headers.forEach((value, key) => {
+    headers[key] = value
+  })
+  return { statusCode: resp.status, headers, body }
+}
 
-  return { statusCode: resp.status, headers, body: respBody }
+export default async function handler(
+  reqOrEvent: Request | NetlifyEvent,
+): Promise<Response | { statusCode: number; headers: Record<string, string>; body: string }> {
+  const app = createGatewayApp()
+
+  if (reqOrEvent instanceof Request) {
+    return app.fetch(reqOrEvent)
+  }
+
+  const req = toRequest(reqOrEvent)
+  const resp = await app.fetch(req)
+  return toLambdaResponse(resp)
 }

@@ -59,12 +59,27 @@ The admin UI has a Chinese/English toggle button at the bottom of the sidebar.
 
 ### No Pre-Configured API Keys
 
-Apps do **not** need a manually-issued token. The gateway uses `X-App-Id` + `X-Device-Id` for identification and access control. Devices are auto-registered on first request.
+Apps do **not** need a manually-issued token. The gateway identifies requests by the headers configured in each app's `identifiers` list. A common setup is `X-App-Id` + `X-Device-Id`, but both are now configurable in the admin UI. Devices are auto-registered on first request when device tracking is enabled.
 
 ### Client Integration
 
 1. On first launch, the app generates a random device identifier (UUID v4), e.g. `device_id` or `install_id`, and saves it to local storage.
-2. Every request includes this identifier.
+2. Every request includes this identifier when the gateway is configured to track devices.
+
+### Generic OpenAI Clients
+
+Clients such as Cherry Studio, ChatBox, many mobile shells, or other OpenAI-compatible tools usually let you set:
+
+- Base URL
+- API Key
+- Model name
+
+But they often do **not** let you attach arbitrary custom headers per request. Based on Cherry Studio's official provider docs, its normal setup documents `API Key` and `API Address`, but does not document a per-request custom-header panel. That means:
+
+- If your gateway configuration requires custom headers such as `X-App-Id`, `X-Device-Id`, or `user_id`, those clients usually cannot satisfy the requirement.
+- If you run **one enabled app only**, you can disable or make the app identifier optional, and the gateway can fall back to that single app automatically.
+- If you also make device/user identifiers optional, those generic clients can still call the gateway, but quota and rate limit will fall back to app-wide and IP-based control rather than per-device control.
+- If you need strict per-device or per-user identification, use a client you control or a client that supports custom headers.
 
 **Example: JavaScript / TypeScript client**
 
@@ -240,9 +255,9 @@ curl -N https://your-gateway.example.com/v1/chat/completions \
 
 ### What the Gateway Does
 
-1. Looks up the app by `X-App-Id`
-2. Auto-registers the device (if `autoRegisterDevices` is on)
-3. Enforces per-device daily/monthly quotas and rate limits
+1. Resolves the app from the configured app identifiers, or falls back to the only enabled app
+2. Auto-registers the device (if `autoRegisterDevices` is on and a tracked device identifier is present)
+3. Enforces per-device quotas when a device identifier is present, otherwise falls back to app-wide usage keys
 4. Checks model profile permissions
 5. Picks a model from the profile's weighted pool
 6. Injects the New API token and forwards the request
@@ -358,7 +373,88 @@ Admin UI for Workers should be deployed separately as a static site, for example
 - Build command: `pnpm --filter @afterglowsdev/admin build`
 - Build output directory: `packages/admin/dist`
 
-**Storage**: the current Workers runtime uses in-memory stores. Config, usage, rate-limit counters, and devices are reset after cold starts or redeploys. If you need persistent config/device storage on Cloudflare, add a KV or D1 backed store implementation.
+**Storage**: the current Workers runtime uses in-memory stores. Config, usage, rate-limit counters, and devices are reset after cold starts or redeploys. The current repository does **not** yet ship a Cloudflare KV or D1 store implementation. The bindings below prepare the platform side only; you still need to wire the corresponding store classes in code.
+
+#### Cloudflare KV Setup
+
+Good fit for:
+
+- gateway config documents
+- device metadata
+- small, key-value style records
+
+Create a KV namespace and bind it in `wrangler.toml`:
+
+```bash
+npx wrangler kv namespace create GATEWAY_KV
+npx wrangler kv namespace create GATEWAY_KV --preview
+```
+
+```toml
+[[kv_namespaces]]
+binding = "GATEWAY_KV"
+id = "your-production-namespace-id"
+preview_id = "your-preview-namespace-id"
+```
+
+Recommended usage in this project:
+
+- config key: `config:gateway`
+- device key: `device:{appId}:{deviceId}`
+
+KV is simple, but it is eventually consistent. It is suitable for config and device records, but not ideal for strict counters.
+
+#### Cloudflare D1 Setup
+
+Good fit for:
+
+- persistent config with query support
+- device lists and filtering
+- future quota and rate-limit history
+
+Create and bind a D1 database:
+
+```bash
+npx wrangler d1 create apigate
+```
+
+Add the returned binding to `wrangler.toml`:
+
+```toml
+[[d1_databases]]
+binding = "DB"
+database_name = "apigate"
+database_id = "your-database-id"
+```
+
+Suggested tables for this repository:
+
+```sql
+CREATE TABLE gateway_config (
+  id TEXT PRIMARY KEY,
+  json TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE devices (
+  app_id TEXT NOT NULL,
+  device_id TEXT NOT NULL,
+  status TEXT NOT NULL,
+  first_seen_at TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL,
+  app_version TEXT,
+  platform TEXT,
+  ip_hash TEXT,
+  note TEXT,
+  PRIMARY KEY (app_id, device_id)
+);
+```
+
+Recommendation:
+
+- use **KV** if you only want persistent config and device records quickly
+- use **D1** if you want proper admin persistence plus queryable device data
+- keep rate-limit counters out of KV/D1 unless you accept approximate behavior or add a dedicated counter design
 
 ### 4. Vercel
 
@@ -654,12 +750,27 @@ pnpm start
 
 ### 不需要预配 API Key
 
-App 不需要管理员手动签发 Token。网关使用 `X-App-Id` + `X-Device-Id` 做身份识别和访问控制。设备首次请求时自动注册，管理员无需逐个添加用户。
+App 不需要管理员手动签发 Token。网关会按每个应用配置里的 `identifiers` 列表识别请求。常见配置是 `X-App-Id` + `X-Device-Id`，但现在这两项都可以在后台自行调整。开启设备跟踪时，设备首次请求会自动注册，管理员无需逐个添加用户。
 
 ### 客户端接入步骤
 
 1. App 首次启动时生成一个随机设备标识（UUID v4），如 `device_id` 或 `install_id`，保存到本地存储
-2. 每次请求 GateLLM 时带上该标识
+2. 如果网关开启了设备跟踪，每次请求 GateLLM 时带上该标识
+
+### 通用 OpenAI 客户端兼容性
+
+像 Cherry Studio、ChatBox、很多移动端壳应用这类 OpenAI 兼容客户端，通常只提供：
+
+- Base URL
+- API Key
+- 模型名
+
+但很多并没有“每次请求附带自定义 Header”的配置项。根据 Cherry Studio 官方文档，常规配置页明确提供的是 `API Key` 和 `API Address`，没有看到标准的逐请求自定义 Header 配置说明。基于这一点，可以直接得出结论：
+
+- 如果你的网关要求 `X-App-Id`、`X-Device-Id`、`user_id` 这类自定义 Header，这类客户端通常没法满足。
+- 如果你只启用 **一个应用**，可以把应用识别码设为非必填，网关会自动回退到这个唯一应用。
+- 如果你再把设备 / 用户识别码也设为非必填，这类通用客户端依然可以调用网关，但额度和限流会退化成按应用、按 IP 控制，而不是按设备精确控制。
+- 如果你需要严格的按设备、按用户识别，就只能用你自己控制的客户端，或者明确支持自定义 Header 的客户端。
 
 **示例：JavaScript / TypeScript 客户端**
 
@@ -833,9 +944,9 @@ curl -N https://your-gateway.example.com/v1/chat/completions \
 
 ### 网关自动处理
 
-1. 通过 `X-App-Id` 查找应用配置
-2. 自动注册新设备（如果应用开启了 `autoRegisterDevices`）
-3. 按设备维度执行每日/每月额度和限流
+1. 先按应用识别码查找应用；如果只有一个启用应用，也可以自动回退到这个应用
+2. 如果请求里带了可跟踪的设备识别码，且应用开启了 `autoRegisterDevices`，就自动注册新设备
+3. 有设备识别码时按设备维度执行额度和限流；没有时退化成按应用维度统计
 4. 检查模型档位权限
 5. 从档位模型池中按权重随机选择模型
 6. 注入 New API Token 并转发请求
@@ -918,7 +1029,90 @@ CONFIG_STORE_TYPE = "memory"
 
 部署：`wrangler deploy`。管理后台需单独部署到 Cloudflare Pages。
 
-**存储说明**：Workers 是无状态 Serverless。配置默认用 `memory`（重启后需通过后台重新配置），可绑定 KV namespace 实现持久化（`cloudflare-kv`）。
+**存储说明**：Workers 是无状态 Serverless。当前仓库默认仍是 `memory`，冷启动、实例漂移或重新部署后会丢配置。下面的 `KV / D1` 内容先解决“Cloudflare 平台怎么绑定”的问题，但**当前仓库还没有现成的 KV / D1 store 实现**，也就是说你光配绑定还不够，还要把代码里的 store 接到这些绑定上。
+
+#### Cloudflare KV 接入步骤
+
+适合放：
+
+- 网关整体配置
+- 设备元数据
+- 体量不大的键值记录
+
+先创建 KV namespace：
+
+```bash
+npx wrangler kv namespace create GATEWAY_KV
+npx wrangler kv namespace create GATEWAY_KV --preview
+```
+
+再把返回的 namespace ID 写进 `wrangler.toml`：
+
+```toml
+[[kv_namespaces]]
+binding = "GATEWAY_KV"
+id = "你的生产环境 namespace id"
+preview_id = "你的预览环境 namespace id"
+```
+
+这个项目里建议的 key 设计：
+
+- 配置：`config:gateway`
+- 设备：`device:{appId}:{deviceId}`
+
+注意：KV 是最终一致性存储，适合配置和设备资料，不适合做严格计数器。
+
+#### Cloudflare D1 接入步骤
+
+适合放：
+
+- 需要长期保存且可查询的配置
+- 设备列表、搜索、筛选
+- 以后要做更完整的额度和审计记录
+
+先创建 D1 数据库：
+
+```bash
+npx wrangler d1 create apigate
+```
+
+再把返回的绑定信息写进 `wrangler.toml`：
+
+```toml
+[[d1_databases]]
+binding = "DB"
+database_name = "apigate"
+database_id = "你的 database id"
+```
+
+这个项目建议至少先建两张表：
+
+```sql
+CREATE TABLE gateway_config (
+  id TEXT PRIMARY KEY,
+  json TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE devices (
+  app_id TEXT NOT NULL,
+  device_id TEXT NOT NULL,
+  status TEXT NOT NULL,
+  first_seen_at TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL,
+  app_version TEXT,
+  platform TEXT,
+  ip_hash TEXT,
+  note TEXT,
+  PRIMARY KEY (app_id, device_id)
+);
+```
+
+选择建议：
+
+- 只想先把后台配置和设备信息持久化，用 **KV**，接得快
+- 想把设备管理做完整，顺手支持查询和筛选，用 **D1**
+- 限流计数不要急着塞进 KV / D1，除非你能接受近似值，或者后面专门做计数方案
 
 ### 4. Vercel
 

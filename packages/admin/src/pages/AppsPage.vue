@@ -16,6 +16,7 @@ const deleteTarget = ref<string | null>(null)
 
 function defaultIdentifiers(): AuthIdentifier[] {
   return [
+    { header: 'X-App-Id', type: 'app', required: true, track: false },
     { header: 'X-Device-Id', type: 'device', required: true, track: true },
     { header: 'user_id', type: 'user', required: false, track: true },
     { header: 'X-App-Version', type: 'custom', required: false, track: false },
@@ -111,6 +112,7 @@ function moveIdentifier(target: AppData, index: number, dir: number) {
 }
 
 const identTypes = [
+  { value: 'app', label: '应用 app' },
   { value: 'device', label: '设备 device' },
   { value: 'user', label: '用户 user' },
   { value: 'custom', label: '自定义 custom' },
@@ -274,7 +276,7 @@ const identTypes = [
         <div v-else class="px-4 py-2.5 text-sm text-gray-500 flex items-center gap-4 flex-wrap">
           <span v-if="app.requireAppSecret">{{ t.apps.requireAppSecret }}: ON</span>
           <span>{{ t.apps.allowedProfiles }}: {{ app.allowedProfiles.join(', ') || 'none' }}</span>
-          <span class="text-gray-400">| 识别码: {{ app.identifiers?.filter(i => i.track).map(i => i.header).join(', ') || '未配置' }}</span>
+          <span class="text-gray-400">| 识别码: {{ app.identifiers?.map(i => i.header).join(', ') || '未配置' }}</span>
           <span v-if="app.perDeviceDailyQuota">日: {{ app.perDeviceDailyQuota }}</span>
           <span v-if="app.perDeviceRateLimitPerMinute">{{ app.perDeviceRateLimitPerMinute }}/min</span>
         </div>

@@ -37,6 +37,7 @@ function validateConfigForSave(config: unknown): { ok: boolean; warnings: string
 
   // Check apps / 检查应用
   if (c.apps && Array.isArray(c.apps)) {
+    const enabledApps = c.apps.filter((app) => (app as Record<string, unknown>).enabled === true)
     for (const app of c.apps) {
       const a = app as Record<string, unknown>
       if (a.enabled === true) {
@@ -45,6 +46,14 @@ function validateConfigForSave(config: unknown): { ok: boolean; warnings: string
         }
         if (!a.allowedProfiles || !Array.isArray(a.allowedProfiles) || (a.allowedProfiles as unknown[]).length === 0) {
           warnings.push(`app "${a.appId || 'unknown'}": enabled but has no allowedProfiles`)
+        }
+        if (
+          enabledApps.length > 1
+          && (!Array.isArray(a.identifiers) || !(a.identifiers as Record<string, unknown>[]).some(
+            (ident) => ident.type === 'app' && typeof ident.header === 'string' && ident.header.length > 0,
+          ))
+        ) {
+          warnings.push(`app "${a.appId || 'unknown'}": multiple enabled apps should configure an app identifier header`)
         }
       }
     }

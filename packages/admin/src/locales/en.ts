@@ -58,7 +58,7 @@ export default {
     minAppVersion: 'Min App Version',
     allowedHours: 'Allowed Hours',
     identifiers: 'Auth Identifiers',
-    identifiersDesc: 'Configure which HTTP headers the client must send and their purpose. Evaluated in order; the first matching device/user type is used as the rate-limit key.',
+    identifiersDesc: 'Configure app, device, user, and custom HTTP headers. App-type identifiers are used to resolve the current app; evaluated in order, the first matching device/user type is used as the rate-limit key.',
     addIdentifier: 'Add Identifier',
     noIdentifiers: 'No identifiers configured',
     required: 'Required',

@@ -58,7 +58,7 @@ export default {
     minAppVersion: '最低版本要求',
     allowedHours: '允许使用时段',
     identifiers: '识别码配置',
-    identifiersDesc: '配置客户端需要携带的 Header 及用途。按列表顺序评估，第一个匹配的 device/user 类型将作为限流主键。',
+    identifiersDesc: '配置客户端可使用的应用、设备、用户和自定义 Header。应用类型用于识别当前应用；按列表顺序评估，第一个匹配的 device/user 类型将作为限流主键。',
     addIdentifier: '添加识别码',
     noIdentifiers: '未配置识别码',
     required: '必填',

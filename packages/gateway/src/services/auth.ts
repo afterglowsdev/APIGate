@@ -1,32 +1,28 @@
 /**
- * App + Device authentication middleware / 应用 + 设备鉴权中间件
+ * App and device authentication middleware.
  *
- * The admin configures which headers are used for device/user identification
- * via `app.identifiers` — no header names are hardcoded (except X-App-Id
- * which maps to the app). The identifiers are evaluated in their configured
- * order; the first matching `track: true` header becomes the rate-limit key.
- *
- * 管理员通过 `app.identifiers` 自由配置识别码，不写死任何 Header 名称。
- * 识别码按配置顺序评估，第一个 `track: true` 的匹配项作为限流主键。
- *
- * Flow / 流程：
- * 1. X-App-Id lookup → find app config
- * 2. Check appSecret if requireAppSecret=true
- * 3. Parse configured identifiers from request headers
- * 4. Auto-register device if enabled
- * 5. Check device blocked status
- * 6. Check minAppVersion
- * 7. Check allowedHours
+ * Design intent:
+ * - Application identification is driven by configured `app` identifiers
+ *   instead of a hardcoded `X-App-Id` requirement.
+ * - When only one app is enabled, the gateway can fall back to that app if no
+ *   explicit app identifier is present. This keeps single-app deployments easy
+ *   to use while still allowing multi-app routing.
+ * - Device/user identifiers are still evaluated in configured order; the first
+ *   tracked match becomes the quota and rate-limit key.
  */
 
 import type { MiddlewareHandler } from 'hono'
 import type { IConfigStore } from '../interfaces/config-store.js'
 import type { IDeviceStore } from '../interfaces/device-store.js'
+import type { AppConfig, AuthIdentifier } from '../types/config.js'
 import { secureCompare, hashIp } from '../utils/crypto.js'
 import { getClientIP } from '../utils/request.js'
 import type { Logger } from './logger.js'
 import {
-  UnauthorizedError, ForbiddenError, OutsideAllowedHoursError, InvalidRequestError,
+  UnauthorizedError,
+  ForbiddenError,
+  OutsideAllowedHoursError,
+  InvalidRequestError,
 } from '../types/errors.js'
 import { isWithinTimeRange } from '../utils/time.js'
 
@@ -36,25 +32,14 @@ export function createAuthMiddleware(
   logger: Logger,
 ): MiddlewareHandler {
   return async (c, next) => {
-    // 1. Identify the app — X-App-Id is the only required header / 识别应用
-    const appId = c.req.header('X-App-Id')
-    if (!appId) {
-      throw new UnauthorizedError('Missing X-App-Id header')
-    }
-
     const config = await configStore.getConfig()
-    const app = config.apps.find((a) => a.appId === appId)
-
-    if (!app) {
-      logger.warn('Auth failed: unknown app', { appId })
-      throw new UnauthorizedError(`Unknown application "${appId}"`)
-    }
+    const app = resolveAppFromRequest(config.apps, c.req.raw.headers, logger)
+    const appId = app.appId
 
     if (!app.enabled) {
       throw new ForbiddenError('app_disabled', `Application "${app.name}" is disabled`)
     }
 
-    // 2. Check app secret if required / 验证应用密钥
     if (app.requireAppSecret) {
       if (!app.appSecret) {
         logger.error('Auth blocked: app secret required but not configured', { appId })
@@ -71,33 +56,50 @@ export function createAuthMiddleware(
       }
     }
 
-    // 3. Parse configured identifiers / 解析管理员配置的识别码
-    //    Evaluated in order; the first `track: true` match is the primary device key
     const identifiers = app.identifiers || []
     let deviceId = ''
-    let deviceMeta: Record<string, string> = {}
+    const deviceMeta: Record<string, string> = {}
 
     for (const ident of identifiers) {
       const value = c.req.header(ident.header)
-      if (value) {
-        // First matching device-type identifier → primary device key
-        if (ident.type === 'device' && ident.track && !deviceId) {
-          deviceId = value
+      if (!value) {
+        if (ident.required) {
+          throw new InvalidRequestError(`Missing required header: ${ident.header}`)
         }
-        // First matching user-type identifier with tracking → also used as device key fallback
-        if (ident.type === 'user' && ident.track && !deviceId) {
-          deviceId = `user:${value}`
+        continue
+      }
+
+      if (ident.type === 'app') {
+        if (value !== app.appId) {
+          logger.warn('Auth failed: invalid app identifier', { appId, header: ident.header, value })
+          throw new UnauthorizedError(`Invalid application identifier "${ident.header}"`)
         }
-        // Collect metadata (version, platform, etc.) / 收集元数据
-        if (ident.type === 'custom') {
-          deviceMeta[ident.header] = value
-        }
-      } else if (ident.required) {
-        throw new InvalidRequestError(`Missing required header: ${ident.header}`)
+        continue
+      }
+
+      if (ident.type === 'device' && ident.track && !deviceId) {
+        deviceId = value
+      }
+      if (ident.type === 'user' && ident.track && !deviceId) {
+        deviceId = `user:${value}`
+      }
+      if (ident.type === 'custom') {
+        deviceMeta[ident.header] = value
       }
     }
 
-    // 4. Device registration and blocking / 设备注册与封禁检查
+    if (!deviceId && !app.allowAnonymousDevices) {
+      const hasTrackedIdentifier = identifiers.some(
+        (ident) => (ident.type === 'device' || ident.type === 'user') && ident.track,
+      )
+      if (hasTrackedIdentifier) {
+        throw new ForbiddenError(
+          'device_identifier_missing',
+          `Application "${appId}" requires a tracked device or user identifier`,
+        )
+      }
+    }
+
     if (deviceId) {
       c.set('deviceId', deviceId)
 
@@ -120,18 +122,18 @@ export function createAuthMiddleware(
           await deviceStore.upsertDevice(device)
           logger.info('Device auto-registered', { appId, deviceId: deviceId.slice(0, 16) })
         } else if (!app.allowAnonymousDevices) {
-          throw new ForbiddenError('device_not_registered',
-            `Device "${deviceId.slice(0, 16)}..." is not registered for app "${appId}"`)
+          throw new ForbiddenError(
+            'device_not_registered',
+            `Device "${deviceId.slice(0, 16)}..." is not registered for app "${appId}"`,
+          )
         }
       }
 
       if (device && device.status === 'blocked') {
         logger.warn('Blocked device attempted request', { appId, deviceId: deviceId.slice(0, 16) })
-        throw new ForbiddenError('device_blocked',
-          `Device is blocked for app "${appId}"`)
+        throw new ForbiddenError('device_blocked', `Device is blocked for app "${appId}"`)
       }
 
-      // Update device metadata / 更新设备元数据
       if (device) {
         device.lastSeenAt = new Date().toISOString()
         const ver = c.req.header('X-App-Version')
@@ -143,16 +145,16 @@ export function createAuthMiddleware(
       }
     }
 
-    // 5. Min version check / 最低版本检查
     if (app.minAppVersion) {
       const clientVersion = c.req.header('X-App-Version')
       if (clientVersion && compareVersions(clientVersion, app.minAppVersion) < 0) {
-        throw new ForbiddenError('version_too_old',
-          `App version ${clientVersion} is below minimum ${app.minAppVersion}`)
+        throw new ForbiddenError(
+          'version_too_old',
+          `App version ${clientVersion} is below minimum ${app.minAppVersion}`,
+        )
       }
     }
 
-    // 6. Allowed hours / 时间窗口
     if (app.allowedHours?.enabled) {
       const { timezone, start, end } = app.allowedHours
       if (!isWithinTimeRange(timezone, start, end)) {
@@ -163,6 +165,75 @@ export function createAuthMiddleware(
     c.set('app', app)
     await next()
   }
+}
+
+function resolveAppFromRequest(apps: AppConfig[], headers: Headers, logger: Logger): AppConfig {
+  const enabledApps = apps.filter((app) => app.enabled)
+  if (enabledApps.length === 0) {
+    throw new UnauthorizedError('No enabled application is configured')
+  }
+
+  const explicitHeaders = new Map<string, string>()
+  const matchedApps: AppConfig[] = []
+
+  for (const app of enabledApps) {
+    for (const ident of getAppIdentifiers(app)) {
+      const value = headers.get(ident.header)
+      if (!value) continue
+      explicitHeaders.set(ident.header, value)
+      if (value === app.appId) {
+        matchedApps.push(app)
+        break
+      }
+    }
+  }
+
+  if (matchedApps.length === 1) {
+    return matchedApps[0]
+  }
+
+  if (matchedApps.length > 1) {
+    logger.warn('Auth failed: ambiguous app identifier', {
+      appIds: matchedApps.map((app) => app.appId),
+    })
+    throw new UnauthorizedError('Ambiguous application identifier')
+  }
+
+  if (explicitHeaders.size > 0) {
+    const [header, value] = explicitHeaders.entries().next().value as [string, string]
+    logger.warn('Auth failed: unknown app identifier', { header, value })
+    throw new UnauthorizedError(`Unknown application identifier "${header}"`)
+  }
+
+  const hasConfiguredAppIdentifiers = enabledApps.some((app) => getAppIdentifiers(app).length > 0)
+  if (hasConfiguredAppIdentifiers) {
+    if (enabledApps.length === 1) {
+      return enabledApps[0]
+    }
+    throw new UnauthorizedError('Missing application identifier header')
+  }
+
+  const legacyAppId = headers.get('X-App-Id')
+  if (legacyAppId) {
+    const legacyApp = enabledApps.find((app) => app.appId === legacyAppId)
+    if (!legacyApp) {
+      logger.warn('Auth failed: unknown legacy app identifier', { appId: legacyAppId })
+      throw new UnauthorizedError(`Unknown application "${legacyAppId}"`)
+    }
+    return legacyApp
+  }
+
+  if (enabledApps.length === 1) {
+    return enabledApps[0]
+  }
+
+  throw new UnauthorizedError('Missing application identifier header')
+}
+
+function getAppIdentifiers(app: AppConfig): AuthIdentifier[] {
+  return (app.identifiers || []).filter(
+    (ident) => ident.type === 'app' && ident.header.trim().length > 0,
+  )
 }
 
 function compareVersions(a: string, b: string): number {

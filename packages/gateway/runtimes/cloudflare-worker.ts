@@ -20,13 +20,20 @@ interface Env {
   LOG_LEVEL?: string
 }
 
+// Keep state at module scope so requests handled by the same isolate share the
+// same in-memory config instead of resetting on every page refresh.
+const configStore = new MemoryConfigStore()
+const usageStore = new MemoryUsageStore()
+const rateLimitStore = new MemoryRateLimitStore()
+const deviceStore = new MemoryDeviceStore()
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const app = createApp({
-      configStore: new MemoryConfigStore(),
-      usageStore: new MemoryUsageStore(),
-      rateLimitStore: new MemoryRateLimitStore(),
-      deviceStore: new MemoryDeviceStore(),
+      configStore,
+      usageStore,
+      rateLimitStore,
+      deviceStore,
       newApiBaseUrl: env.NEW_API_BASE_URL || '',
       newApiToken: env.NEW_API_TOKEN || '',
       adminPassword: env.ADMIN_PASSWORD || 'admin',

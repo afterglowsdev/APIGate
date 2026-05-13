@@ -138,6 +138,7 @@ export const DEFAULT_GATEWAY_CONFIG: GatewayConfig = {
       requireAppSecret: false,
       appSecret: '',
       identifiers: [
+        { header: 'X-App-Id', type: 'app', required: true, track: false },
         { header: 'X-Device-Id', type: 'device', required: true, track: true },
         { header: 'user_id', type: 'user', required: false, track: true },
         { header: 'X-App-Version', type: 'custom', required: false, track: false },
